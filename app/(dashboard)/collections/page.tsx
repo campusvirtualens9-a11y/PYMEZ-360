@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
-import { getEntryExplanation } from '@/lib/accounting/entries'
+import { createCollectionJournalEntry, getEntryExplanation } from '@/lib/accounting/entries'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -61,16 +61,17 @@ export default function CollectionsPage() {
     setSaving(true)
 
     // 1. Registrar cobro
-    await supabase.from('collections').insert({
+    const today = new Date().toISOString().split('T')[0]
+    const { data: collInsert } = await supabase.from('collections').insert({
       company_id: companyId,
       receivable_id: selected.id,
       customer_id: selected.customer_id,
       cash_account_id: cashAccountId,
-      date: new Date().toISOString().split('T')[0],
+      date: today,
       amount,
       payment_method: paymentMethod,
       created_by: userId,
-    })
+    }).select('id').single()
 
     // 2. Actualizar receivable
     const newPending = Number(selected.pending_amount) - amount
@@ -92,12 +93,25 @@ export default function CollectionsPage() {
     }
     await supabase.from('cash_movements').insert({
       company_id: companyId, cash_account_id: cashAccountId,
-      date: new Date().toISOString().split('T')[0],
+      date: today,
       type: 'ingreso', amount, concept: `Cobro a cliente: ${selected.customer?.name}`,
-      reference_type: 'collection', created_by: userId,
+      reference_type: 'collection', reference_id: collInsert?.id ?? null, created_by: userId,
     })
 
-    // 5. Gamificación
+    // 5. Asiento contable
+    if (collInsert?.id) {
+      const selectedCash = cashAccounts.find((c: any) => c.id === cashAccountId)
+      await createCollectionJournalEntry({
+        companyId,
+        date: today,
+        amount,
+        collectionId: collInsert.id,
+        cashAccountType: selectedCash?.type ?? 'caja',
+        customerName: selected.customer?.name,
+      })
+    }
+
+    // 6. Gamificación
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_COLLECTION' })
     await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Cobro registrado' })
 

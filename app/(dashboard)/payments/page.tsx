@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
-import { getEntryExplanation } from '@/lib/accounting/entries'
+import { createPaymentJournalEntry, getEntryExplanation } from '@/lib/accounting/entries'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -66,13 +66,14 @@ export default function PaymentsPage() {
     }
 
     setSaving(true)
+    const today = new Date().toISOString().split('T')[0]
 
-    await supabase.from('payments').insert({
+    const { data: payInsert } = await supabase.from('payments').insert({
       company_id: companyId, payable_id: selected.id,
       supplier_id: selected.supplier_id, cash_account_id: cashAccountId,
-      date: new Date().toISOString().split('T')[0],
+      date: today,
       amount, payment_method: paymentMethod, created_by: userId,
-    })
+    }).select('id').single()
 
     const newPending = Number(selected.pending_amount) - amount
     await supabase.from('payables').update({
@@ -90,10 +91,23 @@ export default function PaymentsPage() {
     }
     await supabase.from('cash_movements').insert({
       company_id: companyId, cash_account_id: cashAccountId,
-      date: new Date().toISOString().split('T')[0],
+      date: today,
       type: 'egreso', amount, concept: `Pago a proveedor: ${selected.supplier?.name}`,
-      reference_type: 'payment', created_by: userId,
+      reference_type: 'payment', reference_id: payInsert?.id ?? null, created_by: userId,
     })
+
+    // Asiento contable
+    if (payInsert?.id) {
+      const selectedCash = cashAccounts.find((c: any) => c.id === cashAccountId)
+      await createPaymentJournalEntry({
+        companyId,
+        date: today,
+        amount,
+        paymentId: payInsert.id,
+        cashAccountType: selectedCash?.type ?? 'caja',
+        supplierName: selected.supplier?.name,
+      })
+    }
 
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_PAYMENT' })
     await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Pago registrado' })

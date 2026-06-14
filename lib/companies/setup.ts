@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { createConstitutionJournalEntry } from '@/lib/accounting/entries'
 import type { BusinessSector } from '@/types'
 
 const BASE_ACCOUNTS = [
@@ -233,4 +234,12 @@ export async function setupCompany(params: {
     { company_id: params.companyId, name: 'Distribuidora Central', email: 'central@proveedor.com', balance: 0 },
     { company_id: params.companyId, name: 'Mayorista del Norte',   email: 'norte@mayorista.com',   balance: 0 },
   ])
+
+  // Asiento de constitución (debe ejecutarse después de insertar el plan de cuentas)
+  await createConstitutionJournalEntry({
+    companyId: params.companyId,
+    date: new Date().toISOString().split('T')[0],
+    cashAmount: params.initialCash ?? 50000,
+    bankAmount: params.initialBank ?? 100000,
+  })
 }
