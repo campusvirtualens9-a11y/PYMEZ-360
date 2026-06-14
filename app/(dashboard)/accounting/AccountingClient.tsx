@@ -150,15 +150,58 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 // ─── Main component ────────────────────────────────────────────────────────
 
 export default function AccountingClient({ entries, accounts, sales, purchases, companyId, userId, companyName, companyCuit }: Props) {
-  const [activeTab, setActiveTab]           = useState<Tab>('diario')
-  const [selectedEntry, setSelectedEntry]   = useState<JournalEntry | null>(null)
+  const [activeTab, setActiveTab]             = useState<Tab>('diario')
+  const [selectedEntry, setSelectedEntry]     = useState<JournalEntry | null>(null)
   const [selectedAccount, setSelectedAccount] = useState<string>('')
-  const [journalViewed, setJournalViewed]   = useState(false)
-  const [ivaSubTab, setIvaSubTab]           = useState<'ventas' | 'compras'>('ventas')
+  const [journalViewed, setJournalViewed]     = useState(false)
+  const [ivaSubTab, setIvaSubTab]             = useState<'ventas' | 'compras'>('ventas')
+
+  // Libro Diario filters
+  const [diarioSearch, setDiarioSearch]         = useState('')
+  const [diarioDateFrom, setDiarioDateFrom]     = useState('')
+  const [diarioDateTo, setDiarioDateTo]         = useState('')
+  const [diarioTypeFilter, setDiarioTypeFilter] = useState<'todos' | 'automatico' | 'manual'>('todos')
+
+  // Plan de Cuentas filters
+  const [cuentasSearch, setCuentasSearch]         = useState('')
+  const [cuentasTypeFilter, setCuentasTypeFilter] = useState('')
+
+  // Libro IVA search
+  const [ivaSearch, setIvaSearch] = useState('')
 
   const trialBalance  = useMemo(() => computeTrialBalance(entries, accounts),  [entries, accounts])
   const libroMayor    = useMemo(() => computeLibroMayor(entries, accounts),    [entries, accounts])
   const libroIVA      = useMemo(() => computeLibroIVA(sales, purchases),       [sales, purchases])
+
+  const filteredEntries = useMemo(() => {
+    let result = [...entries].reverse()
+    if (diarioSearch.trim()) {
+      const q = diarioSearch.toLowerCase()
+      result = result.filter(e => e.description.toLowerCase().includes(q))
+    }
+    if (diarioDateFrom) result = result.filter(e => e.date >= diarioDateFrom)
+    if (diarioDateTo)   result = result.filter(e => e.date <= diarioDateTo)
+    if (diarioTypeFilter !== 'todos') result = result.filter(e => e.entry_type === diarioTypeFilter)
+    return result
+  }, [entries, diarioSearch, diarioDateFrom, diarioDateTo, diarioTypeFilter])
+
+  const filteredAccounts = useMemo(() => {
+    let result = accounts
+    if (cuentasSearch.trim()) {
+      const q = cuentasSearch.toLowerCase()
+      result = result.filter(a => a.name.toLowerCase().includes(q) || a.code.toLowerCase().includes(q))
+    }
+    if (cuentasTypeFilter) result = result.filter(a => a.type === cuentasTypeFilter)
+    return result
+  }, [accounts, cuentasSearch, cuentasTypeFilter])
+
+  const filteredIVA = useMemo(() => {
+    if (!ivaSearch.trim()) return libroIVA[ivaSubTab]
+    const q = ivaSearch.toLowerCase()
+    return libroIVA[ivaSubTab].filter(r =>
+      r.nombre.toLowerCase().includes(q) || r.cuit.toLowerCase().includes(q)
+    )
+  }, [libroIVA, ivaSubTab, ivaSearch])
 
   const erGanancias   = trialBalance.reduce((s, r) => s + r.erGanancias, 0)
   const erPerdidas    = trialBalance.reduce((s, r) => s + r.erPerdidas,  0)
@@ -201,77 +244,146 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
 
       {/* ═══ LIBRO DIARIO ═══════════════════════════════════════════════════ */}
       {activeTab === 'diario' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>📒 Libro Diario</CardTitle>
-            <Badge variant="info">{entries.length} asientos</Badge>
-          </CardHeader>
-          <CardContent className="p-0">
-            {entries.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 text-sm">
-                Aún no hay asientos. Se generan automáticamente al registrar operaciones, o podés crear uno manual con "+ Nuevo asiento".
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Fecha</th>
-                    <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Descripción</th>
-                    <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Tipo</th>
-                    <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total Debe</th>
-                    <th className="px-5 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...entries].reverse().map((e) => {
-                    const totalDebit = (e.lines ?? []).reduce((s, l) => s + Number(l.debit), 0)
-                    return (
-                      <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" onClick={() => openEntry(e)}>
-                        <td className="px-5 py-3 text-slate-600">{formatDate(e.date)}</td>
-                        <td className="px-5 py-3 text-slate-800">{e.description}</td>
-                        <td className="px-5 py-3">
-                          <Badge variant={e.entry_type === 'manual' ? 'warning' : 'info'}>{e.entry_type}</Badge>
-                        </td>
-                        <td className="px-5 py-3 text-right font-medium text-slate-800">{formatCurrency(totalDebit)}</td>
-                        <td className="px-5 py-3 text-slate-400 text-xs text-right">Ver →</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+        <div className="space-y-4">
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <input
+              type="text"
+              placeholder="Buscar descripción..."
+              value={diarioSearch}
+              onChange={e => setDiarioSearch(e.target.value)}
+              className="flex-1 min-w-[180px] px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="date"
+              value={diarioDateFrom}
+              onChange={e => setDiarioDateFrom(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-slate-400 text-sm">→</span>
+            <input
+              type="date"
+              value={diarioDateTo}
+              onChange={e => setDiarioDateTo(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex rounded-lg border border-slate-300 overflow-hidden text-sm">
+              {(['todos', 'automatico', 'manual'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setDiarioTypeFilter(f)}
+                  className={`px-3 py-2 whitespace-nowrap transition-colors ${
+                    diarioTypeFilter === f ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}>
+                  {f === 'todos' ? 'Todos' : f === 'manual' ? 'Manual' : 'Automático'}
+                </button>
+              ))}
+            </div>
+            {(diarioSearch || diarioDateFrom || diarioDateTo || diarioTypeFilter !== 'todos') && (
+              <button
+                onClick={() => { setDiarioSearch(''); setDiarioDateFrom(''); setDiarioDateTo(''); setDiarioTypeFilter('todos') }}
+                className="text-xs text-slate-400 hover:text-slate-600">
+                × Limpiar
+              </button>
             )}
-          </CardContent>
-        </Card>
+            <span className="text-xs text-slate-400 ml-auto">{filteredEntries.length} de {entries.length} asientos</span>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              {entries.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">
+                  Aún no hay asientos. Se generan automáticamente al registrar operaciones, o podés crear uno manual con "+ Nuevo asiento".
+                </div>
+              ) : filteredEntries.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">Sin asientos con los filtros aplicados.</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Fecha</th>
+                      <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Descripción</th>
+                      <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Tipo</th>
+                      <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total Debe</th>
+                      <th className="px-5 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredEntries.map((e) => {
+                      const totalDebit = (e.lines ?? []).reduce((s, l) => s + Number(l.debit), 0)
+                      return (
+                        <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" onClick={() => openEntry(e)}>
+                          <td className="px-5 py-3 text-slate-600">{formatDate(e.date)}</td>
+                          <td className="px-5 py-3 text-slate-800">{e.description}</td>
+                          <td className="px-5 py-3">
+                            <Badge variant={e.entry_type === 'manual' ? 'warning' : 'info'}>{e.entry_type}</Badge>
+                          </td>
+                          <td className="px-5 py-3 text-right font-medium text-slate-800">{formatCurrency(totalDebit)}</td>
+                          <td className="px-5 py-3 text-slate-400 text-xs text-right">Ver →</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* ═══ PLAN DE CUENTAS ════════════════════════════════════════════════ */}
       {activeTab === 'cuentas' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>📋 Plan de Cuentas</CardTitle>
-            <Badge variant="info">{accounts.length} cuentas</Badge>
-          </CardHeader>
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Código</th>
-                  <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Cuenta</th>
-                  <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Tipo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {accounts.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="px-5 py-2 font-mono text-xs text-slate-500">{a.code}</td>
-                    <td className="px-5 py-2 text-slate-800">{a.name}</td>
-                    <td className="px-5 py-2"><Badge variant={typeBadge(a.type) as any}>{a.type}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <input
+              type="text"
+              placeholder="Buscar cuenta o código..."
+              value={cuentasSearch}
+              onChange={e => setCuentasSearch(e.target.value)}
+              className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex rounded-lg border border-slate-300 overflow-hidden text-sm">
+              {(['', 'activo', 'pasivo', 'patrimonio', 'ingreso', 'egreso'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setCuentasTypeFilter(t)}
+                  className={`px-3 py-2 whitespace-nowrap capitalize transition-colors ${
+                    cuentasTypeFilter === t ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}>
+                  {t === '' ? 'Todos' : t}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-slate-400 ml-auto">{filteredAccounts.length} de {accounts.length} cuentas</span>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              {filteredAccounts.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">Sin cuentas con los filtros aplicados.</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Código</th>
+                      <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Cuenta</th>
+                      <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Tipo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAccounts.map((a) => (
+                      <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50">
+                        <td className="px-5 py-2 font-mono text-xs text-slate-500">{a.code}</td>
+                        <td className="px-5 py-2 text-slate-800">{a.name}</td>
+                        <td className="px-5 py-2"><Badge variant={typeBadge(a.type) as any}>{a.type}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* ═══ LIBRO MAYOR ════════════════════════════════════════════════════ */}
@@ -542,60 +654,76 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
             💡 <strong>IVA estimado:</strong> Calculado asumiendo precios con IVA 21% incluido (neto = total ÷ 1,21). Solo aplica a empresas <strong>Responsables Inscriptos</strong>. Monotributistas no declaran IVA.
           </div>
 
-          {/* Sub-tabs ventas/compras */}
-          <div className="flex gap-2">
-            {(['ventas', 'compras'] as const).map(t => (
-              <button key={t} onClick={() => setIvaSubTab(t)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  ivaSubTab === t ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'
-                }`}>
-                {t === 'ventas' ? '📤 Libro IVA Ventas' : '📥 Libro IVA Compras'}
-              </button>
-            ))}
+          {/* Sub-tabs ventas/compras + búsqueda */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex gap-2">
+              {(['ventas', 'compras'] as const).map(t => (
+                <button key={t} onClick={() => { setIvaSubTab(t); setIvaSearch('') }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    ivaSubTab === t ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'
+                  }`}>
+                  {t === 'ventas' ? '📤 Libro IVA Ventas' : '📥 Libro IVA Compras'}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder={`Buscar ${ivaSubTab === 'ventas' ? 'cliente' : 'proveedor'} o CUIT...`}
+              value={ivaSearch}
+              onChange={e => setIvaSearch(e.target.value)}
+              className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+            />
+            {ivaSearch && (
+              <span className="text-xs text-slate-400">{filteredIVA.length} de {libroIVA[ivaSubTab].length}</span>
+            )}
           </div>
 
           <Card>
             <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Fecha</th>
-                    <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">
-                      {ivaSubTab === 'ventas' ? 'Cliente' : 'Proveedor'}
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">CUIT</th>
-                    <th className="text-right px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Neto Gravado</th>
-                    <th className="text-right px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">IVA 21%</th>
-                    <th className="text-right px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {libroIVA[ivaSubTab].map((r, i) => (
-                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                      <td className="px-4 py-2.5 text-slate-600">{formatDate(r.date)}</td>
-                      <td className="px-4 py-2.5 text-slate-800">{r.nombre}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{r.cuit}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-700">{formatCurrency(r.neto)}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-blue-700">{formatCurrency(r.iva)}</td>
-                      <td className="px-4 py-2.5 text-right font-bold text-slate-800">{formatCurrency(r.total)}</td>
+              {filteredIVA.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-sm">Sin registros.</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Fecha</th>
+                      <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">
+                        {ivaSubTab === 'ventas' ? 'Cliente' : 'Proveedor'}
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">CUIT</th>
+                      <th className="text-right px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Neto Gravado</th>
+                      <th className="text-right px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">IVA 21%</th>
+                      <th className="text-right px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
-                  <tr>
-                    <td colSpan={3} className="px-4 py-2 text-slate-700">Total</td>
-                    <td className="px-4 py-2 text-right text-slate-700">
-                      {formatCurrency(libroIVA[ivaSubTab].reduce((s,r)=>s+r.neto,0))}
-                    </td>
-                    <td className="px-4 py-2 text-right text-blue-700">
-                      {formatCurrency(libroIVA[ivaSubTab].reduce((s,r)=>s+r.iva,0))}
-                    </td>
-                    <td className="px-4 py-2 text-right text-slate-800">
-                      {formatCurrency(libroIVA[ivaSubTab].reduce((s,r)=>s+r.total,0))}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredIVA.map((r, i) => (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                        <td className="px-4 py-2.5 text-slate-600">{formatDate(r.date)}</td>
+                        <td className="px-4 py-2.5 text-slate-800">{r.nombre}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{r.cuit}</td>
+                        <td className="px-4 py-2.5 text-right text-slate-700">{formatCurrency(r.neto)}</td>
+                        <td className="px-4 py-2.5 text-right font-medium text-blue-700">{formatCurrency(r.iva)}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-slate-800">{formatCurrency(r.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                    <tr>
+                      <td colSpan={3} className="px-4 py-2 text-slate-700">Total</td>
+                      <td className="px-4 py-2 text-right text-slate-700">
+                        {formatCurrency(filteredIVA.reduce((s,r)=>s+r.neto,0))}
+                      </td>
+                      <td className="px-4 py-2 text-right text-blue-700">
+                        {formatCurrency(filteredIVA.reduce((s,r)=>s+r.iva,0))}
+                      </td>
+                      <td className="px-4 py-2 text-right text-slate-800">
+                        {formatCurrency(filteredIVA.reduce((s,r)=>s+r.total,0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
             </CardContent>
           </Card>
         </div>
