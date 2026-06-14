@@ -74,6 +74,14 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
   const [tSaving,      setTSaving]      = useState(false)
   const [tError,       setTError]       = useState('')
 
+  // Modal nueva cuenta
+  const [newAccOpen,  setNewAccOpen]  = useState(false)
+  const [naName,      setNaName]      = useState('')
+  const [naType,      setNaType]      = useState<'caja' | 'banco'>('banco')
+  const [naBalance,   setNaBalance]   = useState('0')
+  const [naSaving,    setNaSaving]    = useState(false)
+  const [naError,     setNaError]     = useState('')
+
   // ── Load movements ───────────────────────────────────────────────────
   const loadMovements = useCallback(async () => {
     setLoading(true)
@@ -149,6 +157,40 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
     await Promise.all([loadMovements(), loadAccounts()])
   }
 
+  // ── Nueva cuenta ────────────────────────────────────────────────────
+  function openNewAccount() {
+    setNaName(''); setNaType('banco'); setNaBalance('0'); setNaError('')
+    setNewAccOpen(true)
+  }
+
+  async function saveNewAccount() {
+    if (!naName.trim()) { setNaError('El nombre es obligatorio.'); return }
+    const balance = parseFloat(naBalance) || 0
+    if (balance < 0) { setNaError('El saldo inicial no puede ser negativo.'); return }
+    setNaSaving(true)
+
+    const { data: acc, error } = await supabase
+      .from('cash_accounts')
+      .insert({ company_id: companyId, name: naName.trim(), type: naType, balance })
+      .select('id')
+      .single()
+
+    if (error || !acc) { setNaError('Error al crear la cuenta. Intentá de nuevo.'); setNaSaving(false); return }
+
+    // Registrar saldo inicial como movimiento de ingreso
+    if (balance > 0) {
+      await supabase.from('cash_movements').insert({
+        company_id: companyId, cash_account_id: acc.id,
+        date: today, type: 'ingreso', amount: balance,
+        concept: `Saldo inicial — ${naName.trim()}`,
+        reference_type: 'manual', created_by: userId,
+      })
+    }
+
+    setNewAccOpen(false); setNaSaving(false)
+    await Promise.all([loadMovements(), loadAccounts()])
+  }
+
   // ── Transfer ─────────────────────────────────────────────────────────
   function openTransfer() {
     const caja  = accounts.find(a => a.type === 'caja')
@@ -211,7 +253,8 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
           <p className="text-slate-500 text-sm mt-0.5">Saldos actuales y movimientos de fondos.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={openTransfer}>⇄ Transferir entre cuentas</Button>
+          <Button variant="outline" onClick={openNewAccount}>+ Nueva cuenta</Button>
+          <Button variant="outline" onClick={openTransfer}>⇄ Transferir</Button>
           <Button onClick={openManual}>+ Movimiento manual</Button>
         </div>
       </div>
@@ -468,6 +511,62 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setManualOpen(false)} className="flex-1">Cancelar</Button>
             <Button onClick={saveManual} loading={mSaving} className="flex-1">Guardar movimiento</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ═══ MODAL NUEVA CUENTA ═════════════════════════════════════════ */}
+      <Modal open={newAccOpen} onClose={() => setNewAccOpen(false)} title="Nueva cuenta de tesorería">
+        <div className="p-5 space-y-4">
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-r-lg text-xs text-blue-700">
+            💡 Podés agregar cajas (efectivo físico) o cuentas bancarias. Cada una tiene su propio saldo y movimientos independientes.
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de cuenta</label>
+            <div className="flex gap-2">
+              {(['caja', 'banco'] as const).map(t => (
+                <button key={t} onClick={() => setNaType(t)}
+                  className={`flex-1 py-3 px-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                    naType === t
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                  }`}>
+                  {t === 'caja' ? '💵 Caja' : '🏛️ Banco'}
+                  <p className="text-xs font-normal mt-0.5 opacity-70">
+                    {t === 'caja' ? 'Efectivo físico' : 'Cuenta bancaria'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+            <input
+              type="text" value={naName} onChange={e => setNaName(e.target.value)}
+              placeholder={naType === 'caja' ? 'Ej: Caja Sucursal Norte' : 'Ej: Banco Galicia CC 123456'}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Saldo inicial (ARS)</label>
+            <input
+              type="number" value={naBalance} min="0" step="0.01"
+              onChange={e => setNaBalance(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Si ingresás un saldo inicial mayor a cero, se registrará automáticamente como ingreso "Saldo inicial".
+            </p>
+          </div>
+
+          {naError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{naError}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setNewAccOpen(false)} className="flex-1">Cancelar</Button>
+            <Button onClick={saveNewAccount} loading={naSaving} className="flex-1">Crear cuenta</Button>
           </div>
         </div>
       </Modal>

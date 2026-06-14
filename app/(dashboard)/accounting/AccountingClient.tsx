@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { formatCurrency, formatDate } from '@/utils/cn'
 
@@ -150,6 +153,9 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 // ─── Main component ────────────────────────────────────────────────────────
 
 export default function AccountingClient({ entries, accounts, sales, purchases, companyId, userId, companyName, companyCuit }: Props) {
+  const supabase = createClient()
+  const router   = useRouter()
+
   const [activeTab, setActiveTab]             = useState<Tab>('diario')
   const [selectedEntry, setSelectedEntry]     = useState<JournalEntry | null>(null)
   const [selectedAccount, setSelectedAccount] = useState<string>('')
@@ -168,6 +174,14 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
 
   // Libro IVA search
   const [ivaSearch, setIvaSearch] = useState('')
+
+  // Nueva cuenta contable
+  const [newAccOpen,  setNewAccOpen]  = useState(false)
+  const [ncCode,      setNcCode]      = useState('')
+  const [ncName,      setNcName]      = useState('')
+  const [ncType,      setNcType]      = useState<'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'egreso'>('activo')
+  const [ncSaving,    setNcSaving]    = useState(false)
+  const [ncError,     setNcError]     = useState('')
 
   const trialBalance  = useMemo(() => computeTrialBalance(entries, accounts),  [entries, accounts])
   const libroMayor    = useMemo(() => computeLibroMayor(entries, accounts),    [entries, accounts])
@@ -210,6 +224,27 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
   const ivaDebito     = libroIVA.ventas.reduce((s, r) => s + r.iva,   0)
   const ivaCredito    = libroIVA.compras.reduce((s, r) => s + r.iva,  0)
   const saldoTecnico  = ivaDebito - ivaCredito
+
+  async function saveNewAccount() {
+    if (!ncCode.trim()) { setNcError('El código es obligatorio.'); return }
+    if (!ncName.trim()) { setNcError('El nombre es obligatorio.'); return }
+    // Validar que el código no exista ya
+    if (accounts.some(a => a.code === ncCode.trim())) {
+      setNcError(`Ya existe una cuenta con el código "${ncCode.trim()}".`); return
+    }
+    setNcSaving(true)
+    const { error } = await supabase.from('chart_of_accounts').insert({
+      company_id: companyId,
+      code: ncCode.trim(),
+      name: ncName.trim(),
+      type: ncType,
+      is_active: true,
+    })
+    if (error) { setNcError('Error al guardar. Verificá que el código sea único.'); setNcSaving(false); return }
+    setNewAccOpen(false); setNcSaving(false)
+    setNcCode(''); setNcName(''); setNcType('activo'); setNcError('')
+    router.refresh()
+  }
 
   async function openEntry(entry: JournalEntry) {
     setSelectedEntry(entry)
@@ -354,7 +389,10 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
                 </button>
               ))}
             </div>
-            <span className="text-xs text-slate-400 ml-auto">{filteredAccounts.length} de {accounts.length} cuentas</span>
+            <span className="text-xs text-slate-400">{filteredAccounts.length} de {accounts.length} cuentas</span>
+            <Button onClick={() => { setNcCode(''); setNcName(''); setNcType('activo'); setNcError(''); setNewAccOpen(true) }}>
+              + Agregar cuenta
+            </Button>
           </div>
 
           <Card>
@@ -848,6 +886,68 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
           </Card>
         </div>
       )}
+
+      {/* ═══ MODAL NUEVA CUENTA CONTABLE ════════════════════════════════════ */}
+      <Modal open={newAccOpen} onClose={() => setNewAccOpen(false)} title="Nueva cuenta contable">
+        <div className="p-5 space-y-4">
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-r-lg text-xs text-blue-700">
+            💡 El <strong>código</strong> debe seguir la estructura del plan de cuentas argentino (ej: <code>5.3.21</code>). El <strong>tipo</strong> define cómo afecta al balance: activo y pasivo van al Balance General; ingreso y egreso al Estado de Resultados.
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Código *</label>
+              <input
+                type="text" value={ncCode} onChange={e => setNcCode(e.target.value)}
+                placeholder="Ej: 5.3.21"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 font-mono focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Tipo *</label>
+              <select value={ncType} onChange={e => setNcType(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500">
+                <option value="activo">Activo</option>
+                <option value="pasivo">Pasivo</option>
+                <option value="patrimonio">Patrimonio</option>
+                <option value="ingreso">Ingreso</option>
+                <option value="egreso">Egreso</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre de la cuenta *</label>
+            <input
+              type="text" value={ncName} onChange={e => setNcName(e.target.value)}
+              placeholder="Ej: Gastos de capacitación online"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Preview del tipo seleccionado */}
+          <div className={`text-xs p-3 rounded-lg border ${
+            ncType === 'activo'     ? 'bg-blue-50 border-blue-200 text-blue-700' :
+            ncType === 'pasivo'     ? 'bg-red-50 border-red-200 text-red-700' :
+            ncType === 'patrimonio' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+            ncType === 'ingreso'    ? 'bg-green-50 border-green-200 text-green-700' :
+                                     'bg-orange-50 border-orange-200 text-orange-700'
+          }`}>
+            {ncType === 'activo'     && '📦 Activo: lo que tiene la empresa (bienes y derechos). Aumenta con Debe, disminuye con Haber.'}
+            {ncType === 'pasivo'     && '💳 Pasivo: lo que debe la empresa (deudas). Aumenta con Haber, disminuye con Debe.'}
+            {ncType === 'patrimonio' && '🏛️ Patrimonio: el capital de los socios. Aumenta con Haber, disminuye con Debe.'}
+            {ncType === 'ingreso'    && '💰 Ingreso: lo que gana la empresa por sus operaciones. Va al Estado de Resultados (Ganancias).'}
+            {ncType === 'egreso'     && '💸 Egreso: lo que gasta la empresa. Va al Estado de Resultados (Pérdidas).'}
+          </div>
+
+          {ncError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{ncError}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setNewAccOpen(false)} className="flex-1">Cancelar</Button>
+            <Button onClick={saveNewAccount} loading={ncSaving} className="flex-1">Agregar al plan</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ═══ MODAL DETALLE DE ASIENTO ═══════════════════════════════════════ */}
       <Modal open={!!selectedEntry} onClose={() => setSelectedEntry(null)} title="Detalle del asiento" size="lg">
