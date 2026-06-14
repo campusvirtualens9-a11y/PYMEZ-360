@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
 import { createPaymentJournalEntry, getEntryExplanation } from '@/lib/accounting/entries'
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { EducationalTip } from '@/components/ui/EducationalTip'
-import { formatCurrency } from '@/utils/cn'
+import { formatCurrency, formatDate } from '@/utils/cn'
 
 export default function PaymentsPage() {
   const supabase = createClient()
@@ -25,6 +25,7 @@ export default function PaymentsPage() {
   const [tip, setTip] = useState('')
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -38,7 +39,11 @@ export default function PaymentsPage() {
     setCompanyId(company.id)
 
     const [{ data: pay }, { data: cash }] = await Promise.all([
-      supabase.from('payables').select('*, supplier:suppliers(name)').eq('company_id', company.id).neq('status', 'pagado').order('created_at', { ascending: false }),
+      supabase.from('payables')
+        .select('*, supplier:suppliers(name), purchase:purchases(date, total, transaction_type)')
+        .eq('company_id', company.id)
+        .neq('status', 'pagado')
+        .order('created_at', { ascending: false }),
       supabase.from('cash_accounts').select('*').eq('company_id', company.id).order('name'),
     ])
     setPayables(pay ?? [])
@@ -48,6 +53,12 @@ export default function PaymentsPage() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return payables
+    const q = search.toLowerCase()
+    return payables.filter(p => p.supplier?.name?.toLowerCase().includes(q))
+  }, [payables, search])
 
   function openPay(payable: any) {
     setSelected(payable)
@@ -61,7 +72,7 @@ export default function PaymentsPage() {
 
     const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
     if (acct && Number(acct.balance) < amount) {
-      alert('Saldo insuficiente en la caja/banco seleccionada.')
+      alert(`Saldo insuficiente. Disponible: ${formatCurrency(Number(acct.balance))}`)
       return
     }
 
@@ -92,11 +103,11 @@ export default function PaymentsPage() {
     await supabase.from('cash_movements').insert({
       company_id: companyId, cash_account_id: cashAccountId,
       date: today,
-      type: 'egreso', amount, concept: `Pago a proveedor: ${selected.supplier?.name}`,
+      type: 'egreso', amount,
+      concept: `Pago a ${selected.supplier?.name ?? 'proveedor'}`,
       reference_type: 'payment', reference_id: payInsert?.id ?? null, created_by: userId,
     })
 
-    // Asiento contable
     if (payInsert?.id) {
       const selectedCash = cashAccounts.find((c: any) => c.id === cashAccountId)
       await createPaymentJournalEntry({
@@ -118,11 +129,21 @@ export default function PaymentsPage() {
     loadData()
   }
 
+  // Totales
+  const totalPendiente = payables.reduce((s, p) => s + Number(p.pending_amount), 0)
+  const totalOriginal  = payables.reduce((s, p) => s + Number(p.original_amount), 0)
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Pagos a proveedores</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Pagá las deudas pendientes con tus proveedores.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Pagos a proveedores</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Pagá las deudas pendientes con tus proveedores.</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-slate-500 uppercase tracking-wide">Total a pagar</p>
+          <p className="text-xl font-bold text-red-600">{formatCurrency(totalPendiente)}</p>
+        </div>
       </div>
 
       {tip && <EducationalTip message={tip} onClose={() => setTip('')} />}
@@ -131,30 +152,71 @@ export default function PaymentsPage() {
         💡 <strong>¿Qué es un pago?</strong> Cuando compraste a cuenta corriente, le debés dinero al proveedor. Acá registrás cuando le pagás, total o parcialmente. El dinero sale de caja/banco y la deuda con el proveedor se reduce.
       </div>
 
+      {/* KPIs rápidos */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total a pagar</p>
+          <p className="text-xl font-bold text-red-600">{formatCurrency(totalPendiente)}</p>
+        </CardContent></Card>
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Deudas pendientes</p>
+          <p className="text-xl font-bold text-slate-800">{payables.length}</p>
+        </CardContent></Card>
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Pagado parcialmente</p>
+          <p className="text-xl font-bold text-blue-700">{formatCurrency(totalOriginal - totalPendiente)}</p>
+        </CardContent></Card>
+      </div>
+
+      {/* Filtro */}
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por proveedor..."
+          className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 w-64"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="text-slate-400 hover:text-slate-600 text-sm">
+            × Limpiar
+          </button>
+        )}
+        <span className="text-xs text-slate-400 ml-auto">{filtered.length} de {payables.length} resultados</span>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
             <div className="py-12 text-center text-slate-400">Cargando...</div>
-          ) : payables.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-2">✅</div>
-              <p className="text-slate-500 text-sm">No hay deudas pendientes con proveedores.</p>
+              <p className="text-slate-500 text-sm">
+                {search ? `Sin resultados para "${search}".` : 'No hay deudas pendientes con proveedores.'}
+              </p>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Proveedor</th>
-                  <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Original</th>
+                  <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Compra original</th>
+                  <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total compra</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Pendiente</th>
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Estado</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Acción</th>
                 </tr>
               </thead>
               <tbody>
-                {payables.map((p) => (
+                {filtered.map((p) => (
                   <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50">
                     <td className="px-5 py-3 font-medium text-slate-800">{p.supplier?.name ?? '—'}</td>
+                    <td className="px-5 py-3 text-slate-500 text-xs">
+                      {p.purchase?.date ? (
+                        <span>Compra del {formatDate(p.purchase.date)}</span>
+                      ) : '—'}
+                    </td>
                     <td className="px-5 py-3 text-right text-slate-600">{formatCurrency(Number(p.original_amount))}</td>
                     <td className="px-5 py-3 text-right font-bold text-red-600">{formatCurrency(Number(p.pending_amount))}</td>
                     <td className="px-5 py-3">
@@ -173,14 +235,24 @@ export default function PaymentsPage() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Registrar pago">
         <div className="p-5 space-y-4">
-          <p className="text-sm text-slate-600">
-            Proveedor: <strong>{selected?.supplier?.name}</strong> · Deuda: <strong>{formatCurrency(Number(selected?.pending_amount))}</strong>
-          </p>
+          <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r-lg text-sm">
+            <p className="font-medium text-red-800">{selected?.supplier?.name}</p>
+            <div className="flex justify-between mt-1 text-xs text-red-700">
+              <span>Total original: {formatCurrency(Number(selected?.original_amount))}</span>
+              <span>Pendiente: <strong>{formatCurrency(Number(selected?.pending_amount))}</strong></span>
+            </div>
+            {selected?.purchase?.date && (
+              <p className="text-xs text-red-600 mt-1">Compra del {formatDate(selected.purchase.date)}</p>
+            )}
+          </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Monto a pagar</label>
             <input type="number" value={amount} min="0.01" max={selected?.pending_amount ?? 0} step="0.01"
               onChange={(e) => setAmount(Number(e.target.value))}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
+            {amount > 0 && amount < Number(selected?.pending_amount) && (
+              <p className="text-xs text-amber-600 mt-1">⚠️ Pago parcial — quedará pendiente {formatCurrency(Number(selected?.pending_amount) - amount)}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Medio de pago</label>

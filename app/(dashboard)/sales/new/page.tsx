@@ -168,7 +168,7 @@ export default function NewSalePage() {
         date,
         type: 'ingreso',
         amount: total,
-        concept: 'Cobro de venta',
+        concept: `Venta a ${customers.find(c => c.id === customerId)?.name ?? 'cliente'}`,
         reference_type: 'sale',
         reference_id: sale.id,
         created_by: userId,

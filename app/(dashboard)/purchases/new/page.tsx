@@ -96,6 +96,16 @@ export default function NewPurchasePage() {
     if (lines.length === 0) { setError('Agregá al menos un producto.'); return }
     if (transactionType === 'contado' && !cashAccountId) { setError('Elegí la caja/banco para el pago.'); return }
     if (!companyId || !userId) return
+
+    // Verificar saldo suficiente antes de procesar (evita saldo negativo)
+    if (transactionType === 'contado') {
+      const { data: acctPre } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
+      if (!acctPre || Number(acctPre.balance) < total) {
+        setError(`Saldo insuficiente en la cuenta seleccionada. Disponible: ${formatCurrency(Number(acctPre?.balance ?? 0))} — Necesitás: ${formatCurrency(total)}`)
+        return
+      }
+    }
+
     setSaving(true)
     setError('')
 
@@ -156,7 +166,7 @@ export default function NewPurchasePage() {
         date,
         type: 'egreso',
         amount: total,
-        concept: `Pago compra proveedor`,
+        concept: `Compra a ${suppliers.find(s => s.id === supplierId)?.name ?? 'proveedor'}`,
         reference_type: 'purchase',
         reference_id: purchase.id,
         created_by: userId,

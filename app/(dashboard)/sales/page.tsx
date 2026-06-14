@@ -17,12 +17,15 @@ export default async function SalesPage() {
 
   const { data: sales } = await supabase
     .from('sales')
-    .select('*, customer:customers(name)')
+    .select('*, customer:customers(name), items:sale_items(id)')
     .eq('company_id', company.id)
     .order('date', { ascending: false })
 
-  const total = (sales ?? []).reduce((s: number, p: any) => s + Number(p.total), 0)
-  const pending = (sales ?? []).filter((p: any) => p.status === 'pendiente').reduce((s: number, p: any) => s + Number(p.total), 0)
+  const all        = sales ?? []
+  const totalMonto = all.reduce((s: number, p: any) => s + Number(p.total), 0)
+  const pending    = all.filter((p: any) => p.status === 'pendiente')
+  const pendingAmt = pending.reduce((s: number, p: any) => s + Number(p.total), 0)
+  const collected  = all.filter((p: any) => p.status === 'cobrado')
 
   return (
     <div className="space-y-6">
@@ -31,22 +34,58 @@ export default async function SalesPage() {
           <h1 className="text-2xl font-bold text-slate-800">Ventas</h1>
           <p className="text-slate-500 text-sm mt-0.5">Registrá las ventas de productos y servicios a clientes.</p>
         </div>
-        <Link href="/sales/new"><Button>+ Nueva venta</Button></Link>
+        <div className="flex items-center gap-3">
+          {pending.length > 0 && (
+            <Link href="/collections"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-sm font-medium hover:bg-orange-100 transition-colors">
+              💰 {pending.length} cobro{pending.length > 1 ? 's' : ''} pendiente{pending.length > 1 ? 's' : ''} → Ir a Cobros
+            </Link>
+          )}
+          <Link href="/sales/new"><Button>+ Nueva venta</Button></Link>
+        </div>
       </div>
 
       <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-r-lg text-sm text-green-700">
         💡 <strong>Circuito de venta:</strong> Elegís el cliente, los productos y si cobrás de contado o a cuenta corriente. De contado, el dinero entra a caja/banco ahora. A crédito, generás una cuenta a cobrar. En ambos casos, el stock se descuenta automáticamente.
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card><CardContent><p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total vendido</p><p className="text-2xl font-bold text-slate-800">{formatCurrency(total)}</p></CardContent></Card>
-        <Card><CardContent><p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Pendiente de cobro</p><p className={`text-2xl font-bold ${pending > 0 ? 'text-orange-600' : 'text-slate-800'}`}>{formatCurrency(pending)}</p></CardContent></Card>
-        <Card><CardContent><p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Operaciones</p><p className="text-2xl font-bold text-slate-800">{(sales ?? []).length}</p></CardContent></Card>
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <CardContent>
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total vendido</p>
+            <p className="text-2xl font-bold text-slate-800">{formatCurrency(totalMonto)}</p>
+            <p className="text-xs text-slate-400 mt-1">{all.length} operaciones</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Pendiente de cobro</p>
+            <p className={`text-2xl font-bold ${pendingAmt > 0 ? 'text-orange-600' : 'text-slate-800'}`}>{formatCurrency(pendingAmt)}</p>
+            <p className="text-xs text-slate-400 mt-1">{pending.length} ventas a crédito</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Cobradas</p>
+            <p className="text-2xl font-bold text-green-600">{formatCurrency(collected.reduce((s: number, p: any) => s + Number(p.total), 0))}</p>
+            <p className="text-xs text-slate-400 mt-1">{collected.length} ventas</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Ir a módulos</p>
+            <div className="flex flex-col gap-1 mt-1">
+              <Link href="/collections" className="text-xs text-orange-600 hover:underline font-medium">→ Cobros de clientes</Link>
+              <Link href="/inventory" className="text-xs text-blue-600 hover:underline font-medium">→ Ver inventario</Link>
+              <Link href="/customers" className="text-xs text-slate-500 hover:underline font-medium">→ Clientes</Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardContent className="p-0">
-          {!sales || sales.length === 0 ? (
+          {all.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-2">💰</div>
               <p className="text-slate-500 text-sm">Aún no hay ventas registradas.</p>
@@ -60,20 +99,34 @@ export default async function SalesPage() {
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Cliente</th>
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Tipo</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total</th>
-                  <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Estado</th>
+                  <th className="text-center px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Estado</th>
+                  <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Acción</th>
                 </tr>
               </thead>
               <tbody>
-                {sales.map((s: any) => (
+                {all.map((s: any) => (
                   <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50">
                     <td className="px-5 py-3 text-slate-600">{formatDate(s.date)}</td>
                     <td className="px-5 py-3 font-medium text-slate-800">{s.customer?.name ?? '—'}</td>
                     <td className="px-5 py-3 text-slate-600 capitalize">{s.transaction_type?.replace('_', ' ')}</td>
                     <td className="px-5 py-3 text-right font-medium text-slate-800">{formatCurrency(Number(s.total))}</td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="px-5 py-3 text-center">
                       <Badge variant={s.status === 'cobrado' ? 'success' : s.status === 'cancelado' ? 'danger' : 'warning'}>
                         {s.status}
                       </Badge>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {s.status === 'pendiente' ? (
+                        <Link href="/collections"
+                          className="text-xs font-medium text-orange-600 hover:text-orange-800 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-100 hover:bg-orange-100 transition-colors">
+                          Cobrar →
+                        </Link>
+                      ) : (
+                        <Link href="/accounting"
+                          className="text-xs text-slate-400 hover:text-blue-600">
+                          Ver asiento
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}
