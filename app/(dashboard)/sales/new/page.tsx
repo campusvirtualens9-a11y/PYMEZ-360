@@ -15,6 +15,17 @@ import Link from 'next/link'
 
 interface LineItem { productId: string; productName: string; quantity: number; unitPrice: number; costPrice: number }
 
+// ─── Tipos de comprobante de venta (AFIP/ARCA) ───────────────────────────────
+const SALE_DOC_TYPES = [
+  { value: 'factura_a',    letter: 'A',   label: 'Factura A',    desc: 'RI a RI — requiere CUIT del cliente. IVA discriminado.' },
+  { value: 'factura_b',    letter: 'B',   label: 'Factura B',    desc: 'RI a Consumidor Final o Monotributista. IVA no discriminado.' },
+  { value: 'factura_c',    letter: 'C',   label: 'Factura C',    desc: 'Monotributista a cualquiera. Sin IVA.' },
+  { value: 'nota_debito_a',  letter: 'ND-A', label: 'N. Débito A',  desc: 'Cargo adicional a receptor RI.' },
+  { value: 'nota_debito_b',  letter: 'ND-B', label: 'N. Débito B',  desc: 'Cargo adicional a Consumidor Final.' },
+  { value: 'nota_credito_a', letter: 'NC-A', label: 'N. Crédito A', desc: 'Devolución o descuento a receptor RI.' },
+  { value: 'nota_credito_b', letter: 'NC-B', label: 'N. Crédito B', desc: 'Devolución o descuento a Consumidor Final.' },
+]
+
 export default function NewSalePage() {
   const router = useRouter()
   const supabase = createClient()
@@ -33,6 +44,7 @@ export default function NewSalePage() {
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<LineItem[]>([])
   const [ivaRate, setIvaRate] = useState(0.21)
+  const [documentType, setDocumentType] = useState('factura_b')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tip, setTip] = useState('')
@@ -100,8 +112,28 @@ export default function NewSalePage() {
     if (lines.length === 0) { setError('Agregá al menos un producto.'); return }
     if (transactionType === 'contado' && !cashAccountId) { setError('Elegí la caja/banco para el cobro.'); return }
     if (!companyId || !userId) return
+
+    // ── Validación tipo de factura ──────────────────────────────────────────
+    if (documentType === 'factura_a') {
+      const c = customers.find(cu => cu.id === customerId)
+      if (!c?.cuit) {
+        setError('La Factura A requiere que el cliente tenga CUIT registrado (operación entre Responsables Inscriptos). Actualizá los datos del cliente o elegí Factura B.')
+        return
+      }
+    }
+    if (documentType === 'factura_c' && ivaRate > 0) {
+      setError('La Factura C la emiten Monotributistas, que no discriminan IVA. Cambiá el IVA a "Exento" o elegí Factura A/B.')
+      return
+    }
+
     setSaving(true)
     setError('')
+
+    // ── Número correlativo automático ───────────────────────────────────────
+    const { data: lastSale } = await supabase
+      .from('sales').select('doc_number').eq('company_id', companyId)
+      .not('doc_number', 'is', null).order('doc_number', { ascending: false }).limit(1).maybeSingle()
+    const nextDocNumber = (lastSale?.doc_number ?? 0) + 1
 
     // Verificar stock antes de continuar
     for (const l of lines) {
@@ -122,6 +154,8 @@ export default function NewSalePage() {
         date,
         total,
         iva_rate: ivaRate,
+        document_type: documentType,
+        doc_number: nextDocNumber,
         transaction_type: transactionType,
         payment_method: transactionType === 'contado' ? paymentMethod : null,
         cash_account_id: transactionType === 'contado' ? cashAccountId : null,
@@ -213,6 +247,64 @@ export default function NewSalePage() {
 
       {tip && <EducationalTip message={tip} onClose={() => setTip('')} />}
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+
+      {/* ── Tipo de comprobante ─────────────────────────────────────────── */}
+      <Card>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-slate-800">Tipo de comprobante</h2>
+            <span className="text-xs text-slate-400">Se numerará automáticamente</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {SALE_DOC_TYPES.slice(0, 4).map(dt => (
+              <button key={dt.value} type="button" onClick={() => setDocumentType(dt.value)}
+                className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-colors ${
+                  documentType === dt.value
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                }`}>
+                <span className={`text-xl font-bold font-mono w-10 h-10 flex items-center justify-center rounded-lg ${
+                  documentType === dt.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>{dt.letter}</span>
+                <span className={`text-xs font-semibold ${documentType === dt.value ? 'text-blue-700' : 'text-slate-700'}`}>{dt.label}</span>
+              </button>
+            ))}
+          </div>
+          {/* Notas de débito/crédito */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {SALE_DOC_TYPES.slice(4).map(dt => (
+              <button key={dt.value} type="button" onClick={() => setDocumentType(dt.value)}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 text-center transition-colors ${
+                  documentType === dt.value
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                }`}>
+                <span className={`text-xs font-bold font-mono px-2 py-1 rounded ${
+                  documentType === dt.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>{dt.letter}</span>
+                <span className={`text-xs font-medium ${documentType === dt.value ? 'text-blue-700' : 'text-slate-600'}`}>{dt.label}</span>
+              </button>
+            ))}
+          </div>
+          {/* Descripción del tipo seleccionado */}
+          {(() => {
+            const selected = SALE_DOC_TYPES.find(dt => dt.value === documentType)
+            if (!selected) return null
+            return (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 flex items-center gap-2">
+                <span className="font-bold text-slate-800">{selected.label}:</span>
+                <span>{selected.desc}</span>
+                {documentType === 'factura_a' && (
+                  <span className="ml-auto text-amber-600 font-medium">⚠ Requiere CUIT del cliente</span>
+                )}
+                {documentType === 'factura_c' && (
+                  <span className="ml-auto text-purple-600 font-medium">⚠ IVA debe ser Exento</span>
+                )}
+              </div>
+            )
+          })()}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>

@@ -105,6 +105,7 @@ export default async function SalesPage() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Fecha</th>
+                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Comprobante</th>
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Cliente</th>
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Tipo</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total</th>
@@ -114,9 +115,19 @@ export default async function SalesPage() {
                 </tr>
               </thead>
               <tbody>
-                {all.map((s: any) => (
+                {all.map((s: any) => {
+                  const DOC_LETTER: Record<string, string> = { factura_a: 'A', factura_b: 'B', factura_c: 'C', nota_debito_a: 'ND-A', nota_debito_b: 'ND-B', nota_credito_a: 'NC-A', nota_credito_b: 'NC-B' }
+                  const letter = DOC_LETTER[s.document_type ?? 'factura_b'] ?? 'B'
+                  const nro = s.doc_number ? `0001-${String(s.doc_number).padStart(8, '0')}` : '—'
+                  return (
                   <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50">
                     <td className="px-5 py-3 text-slate-600">{formatDate(s.date)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">{letter}</span>
+                        <span className="text-xs text-slate-500 font-mono">{nro}</span>
+                      </div>
+                    </td>
                     <td className="px-5 py-3 font-medium text-slate-800">{s.customer?.name ?? '—'}</td>
                     <td className="px-5 py-3 text-slate-600 capitalize">{s.transaction_type?.replace('_', ' ')}</td>
                     <td className="px-5 py-3 text-right font-medium text-slate-800">{formatCurrency(Number(s.total))}</td>
@@ -147,7 +158,8 @@ export default async function SalesPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             </div>

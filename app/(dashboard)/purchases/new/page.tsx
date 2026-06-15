@@ -15,6 +15,15 @@ import Link from 'next/link'
 
 interface LineItem { productId: string; productName: string; quantity: number; unitPrice: number; costPrice: number }
 
+// ─── Tipos de comprobante recibido (AFIP/ARCA) ──────────────────────────────
+const PURCHASE_DOC_TYPES = [
+  { value: 'factura_a',     letter: 'A',    label: 'Factura A',    desc: 'Proveedor RI a nosotros (RI). IVA discriminado — genera crédito fiscal.' },
+  { value: 'factura_b',     letter: 'B',    label: 'Factura B',    desc: 'Proveedor RI a consumidor final o Monotributista. Sin crédito fiscal.' },
+  { value: 'factura_c',     letter: 'C',    label: 'Factura C',    desc: 'Proveedor Monotributista. No discrimina IVA.' },
+  { value: 'nota_debito_a', letter: 'ND-A', label: 'N. Débito A',  desc: 'Cargo adicional del proveedor (RI a RI).' },
+  { value: 'nota_credito_a',letter: 'NC-A', label: 'N. Crédito A', desc: 'Descuento o devolución del proveedor (RI a RI).' },
+]
+
 export default function NewPurchasePage() {
   const router = useRouter()
   const supabase = createClient()
@@ -36,6 +45,8 @@ export default function NewPurchasePage() {
   const [loading, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tip, setTip] = useState('')
+  const [documentType, setDocumentType] = useState('factura_a')
+  const [supplierDoc, setSupplierDoc] = useState('')
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -100,6 +111,19 @@ export default function NewPurchasePage() {
     if (transactionType === 'contado' && !cashAccountId) { setError('Elegí la caja/banco para el pago.'); return }
     if (!companyId || !userId) return
 
+    // Validaciones de tipo de comprobante
+    if (documentType === 'factura_a') {
+      const s = suppliers.find(su => su.id === supplierId)
+      if (!s?.cuit) {
+        setError('La Factura A requiere que el proveedor tenga CUIT registrado (operación entre Responsables Inscriptos). Actualizá los datos del proveedor o elegí Factura B.')
+        return
+      }
+    }
+    if (documentType === 'factura_c' && ivaRate > 0) {
+      setError('La Factura C la emiten Monotributistas, que no discriminan IVA. Cambiá el IVA a "Exento" o elegí Factura A/B.')
+      return
+    }
+
     // Verificar saldo suficiente antes de procesar (evita saldo negativo)
     if (transactionType === 'contado') {
       const { data: acctPre } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
@@ -111,6 +135,11 @@ export default function NewPurchasePage() {
 
     setSaving(true)
     setError('')
+
+    const { data: lastPurchase } = await supabase
+      .from('purchases').select('doc_number').eq('company_id', companyId)
+      .not('doc_number', 'is', null).order('doc_number', { ascending: false }).limit(1).maybeSingle()
+    const nextDocNumber = (lastPurchase?.doc_number ?? 0) + 1
 
     // 1. Crear compra
     const { data: purchase, error: pErr } = await supabase
@@ -127,6 +156,9 @@ export default function NewPurchasePage() {
         status: transactionType === 'contado' ? 'pagado' : 'pendiente',
         notes,
         created_by: userId,
+        document_type: documentType,
+        doc_number: nextDocNumber,
+        supplier_doc: supplierDoc || null,
       })
       .select('id')
       .single()
@@ -212,6 +244,56 @@ export default function NewPurchasePage() {
       {tip && <EducationalTip message={tip} onClose={() => setTip('')} />}
 
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+
+      {/* ── Tipo de comprobante recibido ─────────────────────────────────────── */}
+      <Card>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-slate-800">Tipo de comprobante recibido</h2>
+            <span className="text-xs text-slate-400">Se numerará internamente</span>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {PURCHASE_DOC_TYPES.map(dt => (
+              <button key={dt.value} type="button" onClick={() => setDocumentType(dt.value)}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 text-center transition-colors ${
+                  documentType === dt.value
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                }`}>
+                <span className={`text-xs font-bold font-mono px-2 py-1 rounded w-full text-center ${
+                  documentType === dt.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>{dt.letter}</span>
+                <span className={`text-xs font-medium leading-tight ${documentType === dt.value ? 'text-blue-700' : 'text-slate-600'}`}>{dt.label}</span>
+              </button>
+            ))}
+          </div>
+          {(() => {
+            const selected = PURCHASE_DOC_TYPES.find(dt => dt.value === documentType)
+            if (!selected) return null
+            return (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 flex flex-wrap items-center gap-2">
+                <span className="font-bold text-slate-800">{selected.label}:</span>
+                <span>{selected.desc}</span>
+                {documentType === 'factura_a' && (
+                  <span className="ml-auto text-amber-600 font-medium">⚠ Requiere CUIT del proveedor</span>
+                )}
+                {documentType === 'factura_c' && (
+                  <span className="ml-auto text-purple-600 font-medium">⚠ IVA debe ser Exento</span>
+                )}
+              </div>
+            )
+          })()}
+          {/* Nro del proveedor */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Nro de comprobante del proveedor <span className="font-normal text-slate-400">(opcional — para conciliación)</span>
+            </label>
+            <input type="text" value={supplierDoc} onChange={e => setSupplierDoc(e.target.value)}
+              placeholder="ej. 0001-00012345"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Proveedor */}

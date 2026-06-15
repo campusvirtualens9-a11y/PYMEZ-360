@@ -72,7 +72,17 @@ export default function PurchaseComprobantePage() {
   const ivaRate   = Number(purchase.iva_rate ?? 0)
   const ivaAmount = ivaRate > 0 ? Math.round(Number(purchase.total) * ivaRate / (1 + ivaRate) * 100) / 100 : 0
   const netAmount = Number(purchase.total) - ivaAmount
-  const nro = `0001-${String(purchase.id).slice(-8).toUpperCase()}`
+  const nro = purchase.doc_number
+    ? `0001-${String(purchase.doc_number).padStart(8, '0')}`
+    : `0001-${String(purchase.id).slice(-8).toUpperCase()}`
+  const DOC_LABELS: Record<string, { letter: string; label: string }> = {
+    factura_a:     { letter: 'A',    label: 'FACTURA A' },
+    factura_b:     { letter: 'B',    label: 'FACTURA B' },
+    factura_c:     { letter: 'C',    label: 'FACTURA C' },
+    nota_debito_a: { letter: 'ND-A', label: 'NOTA DE DÉBITO A' },
+    nota_credito_a:{ letter: 'NC-A', label: 'NOTA DE CRÉDITO A' },
+  }
+  const docInfo = DOC_LABELS[purchase.document_type ?? 'factura_a'] ?? { letter: 'A', label: 'FACTURA A' }
 
   return (
     <>
@@ -128,10 +138,16 @@ export default function PurchaseComprobantePage() {
             {purchase.company?.cuit && <p className="text-sm text-slate-500 mt-0.5">CUIT: {purchase.company.cuit}</p>}
             {purchase.company?.address && <p className="text-sm text-slate-500">{purchase.company.address}</p>}
           </div>
-          <div className="text-right">
-            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">COMPROBANTE DE COMPRA</p>
-            <p className="text-lg font-bold text-slate-800 mt-0.5">Nro: {nro}</p>
-            <p className="text-sm text-slate-500 mt-1">Fecha: {formatDate(purchase.date)}</p>
+          <div className="text-right flex flex-col items-end gap-1">
+            <div className="w-14 h-14 border-2 border-slate-700 rounded-lg flex items-center justify-center mb-1">
+              <span className="text-xl font-bold font-mono text-slate-800">{docInfo.letter}</span>
+            </div>
+            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">{docInfo.label}</p>
+            <p className="text-base font-bold text-slate-800">Nro: {nro}</p>
+            <p className="text-sm text-slate-500">Fecha: {formatDate(purchase.date)}</p>
+            {purchase.supplier_doc && (
+              <p className="text-xs text-slate-400">Nro proveedor: {purchase.supplier_doc}</p>
+            )}
           </div>
         </div>
 
