@@ -396,3 +396,130 @@ export const JOURNAL_TEMPLATES: JournalTemplate[] = [
     ],
   },
 ]
+
+// ─── Transferencia entre cuentas de tesorería ──────────────────────────────
+// Solo genera asiento cuando los tipos difieren (caja ↔ banco).
+// Transferencias del mismo tipo (caja→caja) no tienen impacto contable neto.
+
+export async function createTransferJournalEntry(params: {
+  companyId: string
+  date: string
+  amount: number
+  fromType: 'caja' | 'banco'
+  toType: 'caja' | 'banco'
+  concept: string
+}): Promise<string | null> {
+  if (params.fromType === params.toType) return null
+
+  const supabase = createClient()
+  const accounts = await getAccountMap(params.companyId)
+  if (!accounts) return null
+
+  const debitAccount  = params.toType   === 'banco' ? accounts.banco : accounts.caja
+  const creditAccount = params.fromType === 'banco' ? accounts.banco : accounts.caja
+
+  const { data: entry, error } = await supabase
+    .from('journal_entries')
+    .insert({
+      company_id: params.companyId,
+      date: params.date,
+      description: params.concept,
+      entry_type: 'automatico',
+      reference_type: 'transfer',
+    })
+    .select('id')
+    .single()
+
+  if (error || !entry) return null
+
+  await supabase.from('journal_entry_lines').insert([
+    { journal_entry_id: entry.id, account_id: debitAccount,  debit: params.amount, credit: 0,            description: `Ingreso en ${params.toType}` },
+    { journal_entry_id: entry.id, account_id: creditAccount, debit: 0,            credit: params.amount, description: `Egreso de ${params.fromType}` },
+  ])
+
+  return entry.id
+}
+
+// ─── Movimiento manual de tesorería ────────────────────────────────────────
+// El usuario elige la contrapartida contable en la UI para completar el asiento.
+
+export async function createManualTreasuryEntry(params: {
+  companyId: string
+  date: string
+  amount: number
+  type: 'ingreso' | 'egreso'
+  cashAccountType: 'caja' | 'banco'
+  counterpartAccountId: string
+  concept: string
+}): Promise<string | null> {
+  const supabase = createClient()
+  const accounts = await getAccountMap(params.companyId)
+  if (!accounts) return null
+
+  const cashAccount = params.cashAccountType === 'banco' ? accounts.banco : accounts.caja
+
+  const { data: entry, error } = await supabase
+    .from('journal_entries')
+    .insert({
+      company_id: params.companyId,
+      date: params.date,
+      description: params.concept,
+      entry_type: 'automatico',
+      reference_type: 'manual',
+    })
+    .select('id')
+    .single()
+
+  if (error || !entry) return null
+
+  const lines = params.type === 'ingreso'
+    ? [
+        { journal_entry_id: entry.id, account_id: cashAccount,                 debit: params.amount, credit: 0,            description: `Ingreso en ${params.cashAccountType}` },
+        { journal_entry_id: entry.id, account_id: params.counterpartAccountId, debit: 0,            credit: params.amount, description: params.concept },
+      ]
+    : [
+        { journal_entry_id: entry.id, account_id: params.counterpartAccountId, debit: params.amount, credit: 0,            description: params.concept },
+        { journal_entry_id: entry.id, account_id: cashAccount,                 debit: 0,            credit: params.amount, description: `Egreso de ${params.cashAccountType}` },
+      ]
+
+  await supabase.from('journal_entry_lines').insert(lines)
+  return entry.id
+}
+
+// ─── Saldo inicial de nueva cuenta de tesorería ────────────────────────────
+// Apertura de una nueva caja o banco: Debe Caja/Banco / Haber Capital Social.
+
+export async function createInitialBalanceEntry(params: {
+  companyId: string
+  date: string
+  amount: number
+  cashAccountType: 'caja' | 'banco'
+  accountName: string
+}): Promise<string | null> {
+  const supabase = createClient()
+  const accounts = await getAccountMap(params.companyId)
+  if (!accounts) return null
+
+  const cashAccount = params.cashAccountType === 'banco' ? accounts.banco : accounts.caja
+
+  const { data: entry, error } = await supabase
+    .from('journal_entries')
+    .insert({
+      company_id: params.companyId,
+      date: params.date,
+      description: `Apertura de cuenta: ${params.accountName}`,
+      entry_type: 'automatico',
+      reference_type: 'manual',
+    })
+    .select('id')
+    .single()
+
+  if (error || !entry) return null
+
+  await supabase.from('journal_entry_lines').insert([
+    { journal_entry_id: entry.id, account_id: cashAccount,      debit: params.amount, credit: 0,            description: `Saldo inicial — ${params.accountName}` },
+    { journal_entry_id: entry.id, account_id: accounts.capital, debit: 0,            credit: params.amount, description: 'Aporte de capital adicional' },
+  ])
+
+  return entry.id
+}
