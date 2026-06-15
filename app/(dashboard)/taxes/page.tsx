@@ -285,6 +285,87 @@ export default function TaxesPage() {
           Esta guía es educativa; no reemplaza el asesoramiento contable profesional.
         </p>
       </section>
+
+      {/* ── Apps del ecosistema ──────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-xl">🔗</div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Herramientas del ecosistema educativo</h2>
+            <p className="text-sm text-slate-500">Apps complementarias para practicar en un entorno simulado completo</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Tribut.ar */}
+          <div className="relative overflow-hidden rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-5">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-100 rounded-full -translate-x-4 -translate-y-8 opacity-50" />
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center text-2xl shadow-md">🏛️</div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Tribut.ar</h3>
+                  <p className="text-xs text-purple-600 font-medium">Simulador ARCA / AFIP</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 mb-4">
+                Practicá la liquidación de impuestos federales: IVA, Ganancias, Bienes Personales y Monotributo
+                en un entorno que simula el sistema ARCA (ex-AFIP).
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {['IVA F.731', 'Ganancias', 'Monotributo', 'DDJJ'].map(t => (
+                  <span key={t} className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">{t}</span>
+                ))}
+              </div>
+              <a
+                href="https://tributar2026nuevo.vercel.app/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+              >
+                <span>Abrir Tribut.ar</span>
+                <span>↗</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Sueldos 360 */}
+          <div className="relative overflow-hidden rounded-2xl border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 p-5">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-teal-100 rounded-full -translate-x-4 -translate-y-8 opacity-50" />
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center text-2xl shadow-md">👷</div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Sueldos 360</h3>
+                  <p className="text-xs text-teal-600 font-medium">Liquidación de haberes</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 mb-4">
+                Liquidá sueldos y jornales aplicando las leyes laborales argentinas: categorías, SAC, vacaciones,
+                aportes y contribuciones patronales.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {['Recibos', 'SAC', 'Vacaciones', 'Aportes'].map(t => (
+                  <span key={t} className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">{t}</span>
+                ))}
+              </div>
+              <a
+                href="https://sueldos360.vercel.app/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+              >
+                <span>Abrir Sueldos 360</span>
+                <span>↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-400 text-center">
+          Estas aplicaciones forman parte del ecosistema educativo PYME 360 y son simulaciones para fines de aprendizaje.
+        </p>
+      </section>
     </div>
   )
 }
