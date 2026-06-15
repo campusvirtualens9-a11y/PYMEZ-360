@@ -119,7 +119,7 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Productos</h1>
           <p className="text-slate-500 text-sm mt-0.5">Catálogo de productos e insumos de la empresa.</p>

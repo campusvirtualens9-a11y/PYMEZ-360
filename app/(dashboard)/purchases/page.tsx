@@ -37,16 +37,16 @@ export default async function PurchasesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Compras</h1>
           <p className="text-slate-500 text-sm mt-0.5">Registrá las compras de mercadería y servicios a proveedores.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {pending.length > 0 && (
             <Link href="/payments"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm font-medium hover:bg-red-100 transition-colors">
-              ⚠️ {pending.length} deuda{pending.length > 1 ? 's' : ''} pendiente{pending.length > 1 ? 's' : ''} → Ir a Pagos
+              ⚠️ {pending.length} deuda{pending.length > 1 ? 's' : ''}
             </Link>
           )}
           <Link href="/purchases/new"><Button>+ Nueva compra</Button></Link>

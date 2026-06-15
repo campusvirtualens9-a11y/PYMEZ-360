@@ -112,22 +112,20 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">{company.name}</h1>
           <p className="text-slate-500 text-sm mt-0.5">
             {sectorLabels[company.sector] ?? company.sector} · {company.cuit}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {lowStockItems.length > 0 && (
-            <Link href="/inventory">
-              <Badge variant="warning" className="cursor-pointer">
-                ⚠️ {lowStockItems.length} producto{lowStockItems.length !== 1 ? 's' : ''} con stock bajo
-              </Badge>
-            </Link>
-          )}
-        </div>
+        {lowStockItems.length > 0 && (
+          <Link href="/inventory">
+            <Badge variant="warning" className="cursor-pointer">
+              ⚠️ {lowStockItems.length} producto{lowStockItems.length !== 1 ? 's' : ''} con stock bajo
+            </Badge>
+          </Link>
+        )}
       </div>
 
       {/* KPI Cards */}
@@ -224,7 +222,8 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             {recentSales && recentSales.length > 0 ? (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[400px]">
                 <thead>
                   <tr className="border-b border-slate-100">
                     <th className="text-left px-5 py-2 text-xs text-slate-400 font-medium">Fecha</th>
@@ -248,6 +247,7 @@ export default async function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : (
               <div className="px-5 py-8 text-center text-slate-400 text-sm">
                 Aún no hay ventas registradas.{' '}

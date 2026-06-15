@@ -180,12 +180,12 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Pagos a proveedores</h1>
           <p className="text-slate-500 text-sm mt-0.5">Pagá las deudas pendientes con tus proveedores.</p>
         </div>
-        <div className="text-right">
+        <div>
           <p className="text-xs text-slate-500 uppercase tracking-wide">Total a pagar</p>
           <p className="text-xl font-bold text-red-600">{formatCurrency(totalPendiente)}</p>
         </div>

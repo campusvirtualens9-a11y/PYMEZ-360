@@ -264,15 +264,16 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-slate-200 mb-4 overflow-x-auto pb-0">
+      <div className="flex gap-0.5 border-b border-slate-200 mb-4 overflow-x-auto pb-px">
         {TABS.map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors flex-shrink-0 ${
               activeTab === tab.key
                 ? 'bg-white border border-b-white border-slate-200 text-blue-700 -mb-px'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}>
-            <span>{tab.icon}</span> {tab.label}
+            <span className="text-base">{tab.icon}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
           </button>
         ))}
       </div>

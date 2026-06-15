@@ -332,15 +332,16 @@ export default function ExportsClient({ company, entries, accounts, sales, purch
       </Card>
 
       {/* Tabs de sección */}
-      <div className="flex gap-1 border-b border-slate-200 print:hidden">
+      <div className="flex gap-0.5 border-b border-slate-200 print:hidden overflow-x-auto pb-px">
         {SECTIONS.map(s => (
           <button key={s.key} onClick={() => setSection(s.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors flex-shrink-0 ${
               section === s.key
                 ? 'bg-white border border-b-white border-slate-200 text-blue-700 -mb-px'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}>
-            {s.icon} {s.label}
+            <span>{s.icon}</span>
+            <span className="hidden sm:inline">{s.label}</span>
           </button>
         ))}
       </div>

@@ -178,12 +178,12 @@ export default function CollectionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Cobros</h1>
           <p className="text-slate-500 text-sm mt-0.5">Cobrá las facturas pendientes de clientes.</p>
         </div>
-        <div className="text-right">
+        <div>
           <p className="text-xs text-slate-500 uppercase tracking-wide">Total pendiente</p>
           <p className="text-xl font-bold text-orange-600">{formatCurrency(totalPendiente)}</p>
         </div>

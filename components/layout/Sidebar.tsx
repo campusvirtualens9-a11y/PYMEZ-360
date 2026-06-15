@@ -74,10 +74,10 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       </div>
 
       {/* Navegación */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3">
+      <nav className="flex-1 overflow-y-auto py-2 px-2 overscroll-contain">
         {NAV_ITEMS.map((item: NavItem, i) => {
           if (item.divider) {
-            return <div key={i} className="my-2 border-t border-slate-700/50" />
+            return <div key={i} className="my-1.5 border-t border-slate-700/50" />
           }
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
@@ -86,13 +86,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               href={item.href!}
               onClick={onClose}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mb-0.5',
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all mb-0.5',
                 isActive
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-400 hover:bg-slate-700/60 hover:text-white'
               )}
             >
-              <span className="text-base">{item.icon}</span>
+              <span className="text-base leading-none">{item.icon}</span>
               <span>{item.label}</span>
               {isActive && (
                 <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full" />
@@ -103,7 +103,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-700">
+      <div className="px-4 py-3 border-t border-slate-700 flex-shrink-0">
         <p className="text-xs text-slate-500 text-center">
           App educativa · datos ficticios
         </p>

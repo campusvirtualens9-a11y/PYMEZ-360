@@ -325,15 +325,15 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Tesorería</h1>
           <p className="text-slate-500 text-sm mt-0.5">Saldos actuales y movimientos de fondos.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={openNewAccount}>+ Nueva cuenta</Button>
           <Button variant="outline" onClick={openTransfer}>⇄ Transferir</Button>
-          <Button onClick={openManual}>+ Movimiento manual</Button>
+          <Button onClick={openManual}>+ Movimiento</Button>
         </div>
       </div>
 

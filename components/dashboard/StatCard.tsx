@@ -23,10 +23,10 @@ export function StatCard({ title, value, icon, trend, variant = 'default', isCur
 
   return (
     <Card className="overflow-hidden">
-      <div className="p-5 flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">{title}</p>
-          <p className={cn('text-2xl font-bold', variant === 'danger' ? 'text-red-600' : variant === 'warning' ? 'text-yellow-600' : 'text-slate-800')}>
+      <div className="p-3 sm:p-5 flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1 truncate">{title}</p>
+          <p className={cn('text-lg sm:text-2xl font-bold truncate', variant === 'danger' ? 'text-red-600' : variant === 'warning' ? 'text-yellow-600' : 'text-slate-800')}>
             {displayValue}
           </p>
           {trend && (
@@ -35,7 +35,7 @@ export function StatCard({ title, value, icon, trend, variant = 'default', isCur
             </p>
           )}
         </div>
-        <div className={cn('w-11 h-11 rounded-xl bg-gradient-to-br flex items-center justify-center text-xl shadow-sm', variantStyles[variant])}>
+        <div className={cn('w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br flex items-center justify-center text-lg sm:text-xl shadow-sm flex-shrink-0', variantStyles[variant])}>
           {icon}
         </div>
       </div>
