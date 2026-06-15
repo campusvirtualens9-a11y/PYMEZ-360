@@ -116,17 +116,18 @@ export default async function PurchasesPage() {
                       </Badge>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      {p.status === 'pendiente' ? (
-                        <Link href="/payments"
-                          className="text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 hover:bg-red-100 transition-colors">
-                          Pagar →
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/purchases/${p.id}`}
+                          className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors font-medium">
+                          Ver comprobante
                         </Link>
-                      ) : (
-                        <Link href="/accounting"
-                          className="text-xs text-slate-400 hover:text-blue-600">
-                          Ver asiento
-                        </Link>
-                      )}
+                        {p.status === 'pendiente' && (
+                          <Link href="/payments"
+                            className="text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 hover:bg-red-100 transition-colors">
+                            Pagar →
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

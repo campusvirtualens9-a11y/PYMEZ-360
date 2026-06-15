@@ -9,6 +9,8 @@ interface AccountMap {
   capital: string
   ventas: string
   costo_venta: string
+  iva_credito: string
+  iva_debito: string
 }
 
 export async function getAccountMap(companyId: string): Promise<AccountMap | null> {
@@ -17,7 +19,7 @@ export async function getAccountMap(companyId: string): Promise<AccountMap | nul
     .from('chart_of_accounts')
     .select('id, code')
     .eq('company_id', companyId)
-    .in('code', ['1.1.1', '1.1.2', '1.1.3', '1.2.1', '2.1.1', '3.1.1', '4.1.1', '5.1.1'])
+    .in('code', ['1.1.1', '1.1.2', '1.1.3', '1.2.1', '2.1.1', '3.1.1', '4.1.1', '5.1.1', '1.1.11', '2.1.5'])
 
   if (!data || data.length === 0) return null
   const find = (code: string) => data.find((a) => a.code === code)?.id ?? ''
@@ -30,6 +32,8 @@ export async function getAccountMap(companyId: string): Promise<AccountMap | nul
     capital:     find('3.1.1'),
     ventas:      find('4.1.1'),
     costo_venta: find('5.1.1'),
+    iva_credito: find('1.1.11'),
+    iva_debito:  find('2.1.5'),
   }
 }
 
@@ -37,6 +41,7 @@ export async function getAccountMap(companyId: string): Promise<AccountMap | nul
 
 interface PurchaseRef {
   id: string; company_id: string; date: string; total: number; transaction_type: string
+  iva_rate?: number
 }
 
 export async function createPurchaseJournalEntry(
@@ -65,10 +70,19 @@ export async function createPurchaseJournalEntry(
 
   if (error || !entry) return null
 
-  await supabase.from('journal_entry_lines').insert([
-    { journal_entry_id: entry.id, account_id: accounts.mercaderias, debit: purchase.total, credit: 0, description: 'Mercaderías ingresadas' },
+  const ivaRate   = purchase.iva_rate ?? 0
+  const ivaAmount = ivaRate > 0 ? Math.round(purchase.total * ivaRate / (1 + ivaRate) * 100) / 100 : 0
+  const netAmount = purchase.total - ivaAmount
+
+  const purchaseLines: { journal_entry_id: string; account_id: string; debit: number; credit: number; description: string }[] = [
+    { journal_entry_id: entry.id, account_id: accounts.mercaderias, debit: netAmount, credit: 0, description: ivaAmount > 0 ? 'Mercaderías ingresadas (neto s/IVA)' : 'Mercaderías ingresadas' },
     { journal_entry_id: entry.id, account_id: creditAccount, debit: 0, credit: purchase.total, description: isContado ? 'Pago en efectivo/banco' : 'Deuda con proveedor' },
-  ])
+  ]
+  if (ivaAmount > 0 && accounts.iva_credito) {
+    purchaseLines.splice(1, 0, { journal_entry_id: entry.id, account_id: accounts.iva_credito, debit: ivaAmount, credit: 0, description: 'IVA Crédito Fiscal' })
+  }
+
+  await supabase.from('journal_entry_lines').insert(purchaseLines)
 
   return entry.id
 }
@@ -77,6 +91,7 @@ export async function createPurchaseJournalEntry(
 
 interface SaleRef {
   id: string; company_id: string; date: string; total: number; transaction_type: string
+  iva_rate?: number
 }
 
 export async function createSaleJournalEntry(
@@ -105,10 +120,18 @@ export async function createSaleJournalEntry(
 
   if (error || !entry) return null
 
+  const ivaRate   = sale.iva_rate ?? 0
+  const ivaAmount = ivaRate > 0 ? Math.round(sale.total * ivaRate / (1 + ivaRate) * 100) / 100 : 0
+  const netAmount = sale.total - ivaAmount
+
   const lines: { journal_entry_id: string; account_id: string; debit: number; credit: number; description: string }[] = [
     { journal_entry_id: entry.id, account_id: debitAccount, debit: sale.total, credit: 0, description: isContado ? 'Cobro en efectivo/banco' : 'Cuenta a cobrar' },
-    { journal_entry_id: entry.id, account_id: accounts.ventas, debit: 0, credit: sale.total, description: 'Ingreso por venta' },
+    { journal_entry_id: entry.id, account_id: accounts.ventas, debit: 0, credit: netAmount, description: ivaAmount > 0 ? 'Ingreso por venta (neto s/IVA)' : 'Ingreso por venta' },
   ]
+
+  if (ivaAmount > 0 && accounts.iva_debito) {
+    lines.push({ journal_entry_id: entry.id, account_id: accounts.iva_debito, debit: 0, credit: ivaAmount, description: 'IVA Débito Fiscal' })
+  }
 
   if (totalCost > 0) {
     lines.push(

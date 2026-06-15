@@ -116,17 +116,18 @@ export default async function SalesPage() {
                       </Badge>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      {s.status === 'pendiente' ? (
-                        <Link href="/collections"
-                          className="text-xs font-medium text-orange-600 hover:text-orange-800 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-100 hover:bg-orange-100 transition-colors">
-                          Cobrar →
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/sales/${s.id}`}
+                          className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors font-medium">
+                          Ver comprobante
                         </Link>
-                      ) : (
-                        <Link href="/accounting"
-                          className="text-xs text-slate-400 hover:text-blue-600">
-                          Ver asiento
-                        </Link>
-                      )}
+                        {s.status === 'pendiente' && (
+                          <Link href="/collections"
+                            className="text-xs font-medium text-orange-600 hover:text-orange-800 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-100 hover:bg-orange-100 transition-colors">
+                            Cobrar →
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

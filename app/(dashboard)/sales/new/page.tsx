@@ -32,6 +32,7 @@ export default function NewSalePage() {
   const [cashAccountId, setCashAccountId] = useState('')
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<LineItem[]>([])
+  const [ivaRate, setIvaRate] = useState(0.21)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tip, setTip] = useState('')
@@ -91,6 +92,8 @@ export default function NewSalePage() {
 
   const total = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0)
   const totalCost = lines.reduce((s, l) => s + l.quantity * l.costPrice, 0)
+  const ivaAmount = ivaRate > 0 ? Math.round(total * ivaRate / (1 + ivaRate) * 100) / 100 : 0
+  const netAmount = total - ivaAmount
 
   async function handleSave() {
     if (!customerId) { setError('Elegí un cliente.'); return }
@@ -118,6 +121,7 @@ export default function NewSalePage() {
         customer_id: customerId,
         date,
         total,
+        iva_rate: ivaRate,
         transaction_type: transactionType,
         payment_method: transactionType === 'contado' ? paymentMethod : null,
         cash_account_id: transactionType === 'contado' ? cashAccountId : null,
@@ -190,7 +194,7 @@ export default function NewSalePage() {
 
     // 5. Asiento contable
     await createSaleJournalEntry(
-      { ...({} as any), id: sale.id, company_id: companyId, date, total, transaction_type: transactionType },
+      { ...({} as any), id: sale.id, company_id: companyId, date, total, transaction_type: transactionType, iva_rate: ivaRate },
       totalCost
     )
 
@@ -270,6 +274,19 @@ export default function NewSalePage() {
               </>
             )}
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">IVA</label>
+              <div className="flex gap-2">
+                {[{ value: 0.21, label: '21%' }, { value: 0.105, label: '10.5%' }, { value: 0, label: 'Exento' }].map((opt) => (
+                  <button key={opt.value} type="button" onClick={() => setIvaRate(opt.value)}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                      ivaRate === opt.value ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
               <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
@@ -281,14 +298,20 @@ export default function NewSalePage() {
           <CardContent>
             <h2 className="font-semibold text-slate-800 mb-4">Resumen</h2>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-slate-600"><span>Subtotal costo</span><span>{formatCurrency(totalCost)}</span></div>
-              <div className="flex justify-between text-slate-600"><span>Margen</span><span className="text-green-600">{formatCurrency(total - totalCost)}</span></div>
-              <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-bold text-lg text-slate-800">
-                <span>Total</span><span>{formatCurrency(total)}</span>
+              {ivaRate > 0 && (
+                <>
+                  <div className="flex justify-between text-slate-600"><span>Subtotal neto</span><span>{formatCurrency(netAmount)}</span></div>
+                  <div className="flex justify-between text-slate-600"><span>IVA {(ivaRate * 100).toFixed(1)}%</span><span>{formatCurrency(ivaAmount)}</span></div>
+                </>
+              )}
+              <div className={`flex justify-between font-bold text-lg text-slate-800 ${ivaRate > 0 ? 'border-t border-slate-200 pt-2 mt-2' : ''}`}>
+                <span>Total c/IVA</span><span>{formatCurrency(total)}</span>
               </div>
-              {total > 0 && totalCost > 0 && (
+              <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between text-slate-600 text-xs"><span>Costo</span><span>{formatCurrency(totalCost)}</span></div>
+              <div className="flex justify-between text-xs"><span>Margen</span><span className="text-green-600">{formatCurrency(netAmount - totalCost)}</span></div>
+              {netAmount > 0 && totalCost > 0 && (
                 <div className="text-xs text-green-600 font-medium">
-                  Margen: {(((total - totalCost) / total) * 100).toFixed(1)}%
+                  Margen s/IVA: {(((netAmount - totalCost) / netAmount) * 100).toFixed(1)}%
                 </div>
               )}
             </div>

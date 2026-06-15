@@ -32,6 +32,7 @@ export default function NewPurchasePage() {
   const [cashAccountId, setCashAccountId] = useState('')
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<LineItem[]>([])
+  const [ivaRate, setIvaRate] = useState(0.21)
   const [loading, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tip, setTip] = useState('')
@@ -90,6 +91,8 @@ export default function NewPurchasePage() {
   }
 
   const total = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0)
+  const ivaAmount = ivaRate > 0 ? Math.round(total * ivaRate / (1 + ivaRate) * 100) / 100 : 0
+  const netAmount = total - ivaAmount
 
   async function handleSave() {
     if (!supplierId) { setError('Elegí un proveedor.'); return }
@@ -117,6 +120,7 @@ export default function NewPurchasePage() {
         supplier_id: supplierId,
         date,
         total,
+        iva_rate: ivaRate,
         transaction_type: transactionType,
         payment_method: transactionType === 'contado' ? paymentMethod : null,
         cash_account_id: transactionType === 'contado' ? cashAccountId : null,
@@ -188,7 +192,7 @@ export default function NewPurchasePage() {
 
     // 5. Asiento contable automático
     await createPurchaseJournalEntry(
-      { ...({} as any), id: purchase.id, company_id: companyId, date, total, transaction_type: transactionType },
+      { ...({} as any), id: purchase.id, company_id: companyId, date, total, transaction_type: transactionType, iva_rate: ivaRate },
       transactionType === 'contado' ? cashAccountId : null
     )
 
@@ -269,6 +273,19 @@ export default function NewPurchasePage() {
               </>
             )}
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">IVA</label>
+              <div className="flex gap-2">
+                {[{ value: 0.21, label: '21%' }, { value: 0.105, label: '10.5%' }, { value: 0, label: 'Exento' }].map((opt) => (
+                  <button key={opt.value} type="button" onClick={() => setIvaRate(opt.value)}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                      ivaRate === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
               <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opcional..."
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
@@ -281,14 +298,17 @@ export default function NewPurchasePage() {
           <CardContent>
             <h2 className="font-semibold text-slate-800 mb-4">Resumen</h2>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-slate-600">
-                <span>Productos</span><span>{lines.length} ítems</span>
+              {ivaRate > 0 && (
+                <>
+                  <div className="flex justify-between text-slate-600"><span>Subtotal neto</span><span>{formatCurrency(netAmount)}</span></div>
+                  <div className="flex justify-between text-slate-600"><span>IVA {(ivaRate * 100).toFixed(1)}%</span><span>{formatCurrency(ivaAmount)}</span></div>
+                </>
+              )}
+              <div className={`flex justify-between font-bold text-lg text-slate-800 ${ivaRate > 0 ? 'border-t border-slate-200 pt-2 mt-2' : ''}`}>
+                <span>Total c/IVA</span><span>{formatCurrency(total)}</span>
               </div>
-              <div className="flex justify-between text-slate-600">
-                <span>Tipo</span><span>{transactionType === 'contado' ? 'Pago inmediato' : 'A crédito'}</span>
-              </div>
-              <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-bold text-lg text-slate-800">
-                <span>Total</span><span>{formatCurrency(total)}</span>
+              <div className="flex justify-between text-xs text-slate-500 border-t border-slate-200 pt-2 mt-1">
+                <span>Tipo de pago</span><span>{transactionType === 'contado' ? 'Inmediato' : 'A crédito'}</span>
               </div>
             </div>
 

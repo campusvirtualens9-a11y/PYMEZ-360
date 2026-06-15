@@ -26,6 +26,8 @@ export default function PaymentsPage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [reciboOpen, setReciboOpen] = useState(false)
+  const [reciboData, setReciboData] = useState<{ supplierName: string; amount: number; date: string; paymentMethod: string; cashAccountName: string } | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -126,7 +128,41 @@ export default function PaymentsPage() {
     setTip(getEntryExplanation('pago'))
     setModalOpen(false)
     setSaving(false)
+
+    const selectedCashAccount = cashAccounts.find((c: any) => c.id === cashAccountId)
+    setReciboData({
+      supplierName: selected.supplier?.name ?? '—',
+      amount,
+      date: today,
+      paymentMethod,
+      cashAccountName: selectedCashAccount?.name ?? '—',
+    })
+    setReciboOpen(true)
     loadData()
+  }
+
+  function printRecibo() {
+    if (!reciboData) return
+    const content = `<html><head><title>Recibo de Pago</title><style>
+      body{font-family:sans-serif;padding:30px;max-width:400px;margin:0 auto;}
+      h2{border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:20px;}
+      .row{display:flex;justify-content:space-between;margin:10px 0;font-size:14px;}
+      .total{border-top:2px solid #333;padding-top:10px;font-weight:bold;font-size:18px;margin-top:10px;}
+      .footer{font-size:11px;color:#999;text-align:center;margin-top:30px;}
+    </style></head><body>
+      <h2>RECIBO DE PAGO</h2>
+      <div class="row"><span>Proveedor:</span><span><strong>${reciboData.supplierName}</strong></span></div>
+      <div class="row"><span>Fecha:</span><span>${reciboData.date}</span></div>
+      <div class="row"><span>Medio de pago:</span><span>${reciboData.paymentMethod}</span></div>
+      <div class="row"><span>Desde:</span><span>${reciboData.cashAccountName}</span></div>
+      <div class="row total"><span>TOTAL PAGADO:</span><span>$${reciboData.amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+      <div class="footer">EduERP 360 — herramienta educativa. Documento no válido como recibo legal.</div>
+    </body></html>`
+    const w = window.open('', '_blank', 'width=500,height=650')
+    if (!w) return
+    w.document.write(content)
+    w.document.close()
+    w.print()
   }
 
   // Totales
@@ -273,6 +309,31 @@ export default function PaymentsPage() {
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setModalOpen(false)} className="flex-1">Cancelar</Button>
             <Button onClick={handlePay} loading={saving} className="flex-1">Confirmar pago</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={reciboOpen} onClose={() => setReciboOpen(false)} title="Pago registrado">
+        <div className="p-5 space-y-4">
+          <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+            <p className="font-bold text-green-800 text-lg">Pago exitoso</p>
+            <p className="text-green-700 text-sm mt-1">El asiento contable fue generado automáticamente.</p>
+          </div>
+          {reciboData && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-slate-600"><span>Proveedor:</span><span className="font-medium">{reciboData.supplierName}</span></div>
+              <div className="flex justify-between text-slate-600"><span>Fecha:</span><span>{reciboData.date}</span></div>
+              <div className="flex justify-between text-slate-600"><span>Medio:</span><span className="capitalize">{reciboData.paymentMethod}</span></div>
+              <div className="flex justify-between text-slate-600"><span>Desde:</span><span>{reciboData.cashAccountName}</span></div>
+              <div className="flex justify-between font-bold text-slate-800 text-lg border-t pt-2 mt-2">
+                <span>Total pagado:</span>
+                <span>${reciboData.amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={printRecibo} className="flex-1">Imprimir recibo</Button>
+            <Button onClick={() => setReciboOpen(false)} className="flex-1">Cerrar</Button>
           </div>
         </div>
       </Modal>

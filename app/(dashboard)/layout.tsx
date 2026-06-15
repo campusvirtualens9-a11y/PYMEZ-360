@@ -25,9 +25,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Sidebar />
-      <Header profile={profile} companyName={company?.name} />
-      <main className="ml-[260px] pt-14 min-h-screen">
+      <div className="print:hidden">
+        <Sidebar />
+        <Header profile={profile} companyName={company?.name} />
+      </div>
+      <main className="ml-[260px] pt-14 min-h-screen print:ml-0 print:pt-0">
         <div className="p-6">
           {children}
         </div>
