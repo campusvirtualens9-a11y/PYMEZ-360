@@ -97,7 +97,22 @@ export default function NewCompanyPage() {
       {step === 1 && (
         <Card>
           <CardContent className="space-y-4 pt-2">
-            <h2 className="text-lg font-semibold text-slate-800">Datos de la empresa</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-800">Datos de la empresa</h2>
+              <button type="button"
+                onClick={() => {
+                  setName('Distribuidora del Norte S.A.')
+                  setCuit('30-71234567-9')
+                  setAddress('Av. Andrés Guacurarí 1820, Posadas, Misiones')
+                  setSector('comercial')
+                  setIibbRate(0.03)
+                  setInitialCash(80000)
+                  setInitialBank(250000)
+                }}
+                className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 hover:border-blue-300 transition-colors font-medium">
+                🏢 Cargar empresa demo
+              </button>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Nombre de la empresa *</label>

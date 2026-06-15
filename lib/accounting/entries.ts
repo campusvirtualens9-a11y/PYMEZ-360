@@ -244,12 +244,14 @@ export async function createConstitutionJournalEntry(params: {
   date: string
   cashAmount: number
   bankAmount: number
+  goodsAmount?: number
 }): Promise<string | null> {
   const supabase = createClient()
   const accounts = await getAccountMap(params.companyId)
   if (!accounts) return null
 
-  const total = params.cashAmount + params.bankAmount
+  const goodsAmount = params.goodsAmount ?? 0
+  const total = params.cashAmount + params.bankAmount + goodsAmount
   if (total === 0) return null
 
   const { data: entry, error } = await supabase
@@ -257,7 +259,7 @@ export async function createConstitutionJournalEntry(params: {
     .insert({
       company_id: params.companyId,
       date: params.date,
-      description: 'Asiento de constitución — Aporte inicial de capital',
+      description: 'Asiento de apertura — Aporte inicial de capital y bienes',
       entry_type: 'automatico',
     })
     .select('id')
@@ -273,7 +275,10 @@ export async function createConstitutionJournalEntry(params: {
   if (params.bankAmount > 0) {
     lines.push({ journal_entry_id: entry.id, account_id: accounts.banco, debit: params.bankAmount, credit: 0, description: 'Depósito bancario inicial' })
   }
-  lines.push({ journal_entry_id: entry.id, account_id: accounts.capital, debit: 0, credit: total, description: 'Capital social aportado' })
+  if (goodsAmount > 0) {
+    lines.push({ journal_entry_id: entry.id, account_id: accounts.mercaderias, debit: goodsAmount, credit: 0, description: 'Mercaderías aportadas al inicio de actividades' })
+  }
+  lines.push({ journal_entry_id: entry.id, account_id: accounts.capital, debit: 0, credit: total, description: 'Capital social aportado por los socios' })
 
   await supabase.from('journal_entry_lines').insert(lines)
   return entry.id

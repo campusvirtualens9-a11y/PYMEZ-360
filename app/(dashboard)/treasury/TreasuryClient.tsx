@@ -18,7 +18,24 @@ import {
 
 interface CashAccount {
   id: string; name: string; type: 'caja' | 'banco'; balance: number
+  account_number?: string; bank_account_type?: string
 }
+interface Checkbook {
+  id: string; cash_account_id: string; checkbook_type: string
+  number_from: number; number_to: number; current_number: number; status: string
+}
+interface ChequeData {
+  beneficiary: string; amount: number; date: string
+  accountName: string; checkNumber: number; checkbookType: string
+}
+
+const BANK_ACCOUNT_TYPES = [
+  { value: 'cuenta_corriente',    label: 'Cuenta Corriente'          },
+  { value: 'caja_ahorro_pesos',   label: 'Caja de Ahorro en Pesos'   },
+  { value: 'caja_ahorro_dolares', label: 'Caja de Ahorro en Dólares' },
+  { value: 'cuenta_sueldo',       label: 'Cuenta Sueldo'             },
+  { value: 'cuenta_comitente',    label: 'Cuenta Comitente'          },
+]
 interface Movement {
   id: string; date: string; concept: string; type: 'ingreso' | 'egreso'
   amount: number; reference_type: string | null; reference_id: string | null
@@ -106,12 +123,29 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
   const [tError,       setTError]       = useState('')
 
   // Modal nueva cuenta
-  const [newAccOpen, setNewAccOpen] = useState(false)
-  const [naName,     setNaName]     = useState('')
-  const [naType,     setNaType]     = useState<'caja' | 'banco'>('banco')
-  const [naBalance,  setNaBalance]  = useState('0')
-  const [naSaving,   setNaSaving]   = useState(false)
-  const [naError,    setNaError]    = useState('')
+  const [newAccOpen,    setNewAccOpen]    = useState(false)
+  const [naName,        setNaName]        = useState('')
+  const [naType,        setNaType]        = useState<'caja' | 'banco'>('banco')
+  const [naBalance,     setNaBalance]     = useState('0')
+  const [naAccNumber,   setNaAccNumber]   = useState('')
+  const [naBankType,    setNaBankType]    = useState('cuenta_corriente')
+  const [naSaving,      setNaSaving]      = useState(false)
+  const [naError,       setNaError]       = useState('')
+
+  // Modal chequera
+  const [checkbookOpen,    setCheckbookOpen]    = useState(false)
+  const [cbAccountId,      setCbAccountId]      = useState('')
+  const [cbAccountName,    setCbAccountName]    = useState('')
+  const [cbType,           setCbType]           = useState<'comun' | 'diferido'>('comun')
+  const [cbFrom,           setCbFrom]           = useState('')
+  const [cbTo,             setCbTo]             = useState('')
+  const [cbSaving,         setCbSaving]         = useState(false)
+  const [cbError,          setCbError]          = useState('')
+  const [checkbooks,       setCheckbooks]       = useState<Checkbook[]>([])
+
+  // Modal imprimir cheque
+  const [chequeOpen,    setChequeOpen]    = useState(false)
+  const [chequeData,    setChequeData]    = useState<ChequeData | null>(null)
 
   // ── Load data ─────────────────────────────────────────────────────────
   const loadMovements = useCallback(async () => {
@@ -139,6 +173,12 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
     if (data) setAccounts(data as CashAccount[])
   }, [companyId])
 
+  const loadCheckbooks = useCallback(async () => {
+    const { data } = await supabase
+      .from('checkbooks').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
+    if (data) setCheckbooks(data as Checkbook[])
+  }, [companyId])
+
   const loadChartAccounts = useCallback(async () => {
     const { data } = await supabase
       .from('chart_of_accounts')
@@ -152,7 +192,8 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
   useEffect(() => {
     loadMovements()
     loadChartAccounts()
-  }, [loadMovements, loadChartAccounts])
+    loadCheckbooks()
+  }, [loadMovements, loadChartAccounts, loadCheckbooks])
 
   // ── Computed KPIs ────────────────────────────────────────────────────
   const totalIngreso = useMemo(() => movements.filter(m => m.type === 'ingreso').reduce((s, m) => s + Number(m.amount), 0), [movements])
@@ -219,7 +260,40 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
   // ── Nueva cuenta ─────────────────────────────────────────────────────
   function openNewAccount() {
     setNaName(''); setNaType('banco'); setNaBalance('0'); setNaError('')
+    setNaAccNumber(''); setNaBankType('cuenta_corriente')
     setNewAccOpen(true)
+  }
+
+  function openCheckbook(acc: CashAccount) {
+    setCbAccountId(acc.id); setCbAccountName(acc.name)
+    setCbType('comun'); setCbFrom(''); setCbTo(''); setCbError('')
+    setCheckbookOpen(true)
+  }
+
+  async function saveCheckbook() {
+    const from = parseInt(cbFrom) || 0
+    const to   = parseInt(cbTo)   || 0
+    if (!from || !to || from >= to) { setCbError('Ingresá un rango válido (desde < hasta).'); return }
+    setCbSaving(true); setCbError('')
+    const { error } = await supabase.from('checkbooks').insert({
+      company_id: companyId,
+      cash_account_id: cbAccountId,
+      checkbook_type: cbType,
+      number_from: from,
+      number_to: to,
+      current_number: from,
+      status: 'activo',
+    })
+    if (error) { setCbError('Error al guardar la chequera.'); setCbSaving(false); return }
+    setCheckbookOpen(false); setCbSaving(false)
+    loadCheckbooks()
+  }
+
+  async function nextCheckNumber(checkbookId: string, current: number, to: number) {
+    const next = current + 1
+    if (next > to) return
+    await supabase.from('checkbooks').update({ current_number: next }).eq('id', checkbookId)
+    loadCheckbooks()
   }
 
   async function saveNewAccount() {
@@ -230,7 +304,16 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
 
     const { data: acc, error } = await supabase
       .from('cash_accounts')
-      .insert({ company_id: companyId, name: naName.trim(), type: naType, balance })
+      .insert({
+        company_id: companyId,
+        name: naName.trim(),
+        type: naType,
+        balance,
+        ...(naType === 'banco' && {
+          account_number:    naAccNumber.trim() || null,
+          bank_account_type: naBankType,
+        }),
+      })
       .select('id')
       .single()
 
@@ -525,6 +608,77 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
         </CardContent>
       </Card>
 
+      {/* ── Chequeras ──────────────────────────────────────────────────── */}
+      {accounts.filter(a => a.type === 'banco').length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Chequeras</h2>
+            <button onClick={() => {
+              const banco = accounts.find(a => a.type === 'banco')
+              if (banco) openCheckbook(banco)
+            }} className="text-xs text-blue-600 hover:underline font-medium">
+              + Agregar chequera
+            </button>
+          </div>
+          {checkbooks.length === 0 ? (
+            <div className="text-center py-6 text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+              No hay chequeras registradas. Agregá una para tus cuentas corrientes.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {checkbooks.map(cb => {
+                const acc = accounts.find(a => a.id === cb.cash_account_id)
+                const remaining = cb.number_to - cb.current_number + 1
+                const pct = Math.round(((cb.current_number - cb.number_from) / (cb.number_to - cb.number_from + 1)) * 100)
+                return (
+                  <Card key={cb.id} className={cb.status === 'agotada' ? 'opacity-50' : ''}>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                          {cb.checkbook_type === 'diferido' ? '📅 Diferido' : '✏️ Común'}
+                        </span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          cb.status === 'activo' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                        }`}>{cb.status}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">{acc?.name ?? '—'}</p>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-bold text-slate-800 font-mono">{String(cb.current_number).padStart(8, '0')}</span>
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        Rango: {String(cb.number_from).padStart(8,'0')} — {String(cb.number_to).padStart(8,'0')}
+                      </div>
+                      {/* Barra de uso */}
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div className={`h-1.5 rounded-full ${pct > 80 ? 'bg-orange-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>{remaining} cheques restantes</span>
+                        {cb.status === 'activo' && remaining > 0 && (
+                          <button onClick={() => {
+                            setChequeData({
+                              beneficiary: '',
+                              amount: 0,
+                              date: today,
+                              accountName: acc?.name ?? '',
+                              checkNumber: cb.current_number,
+                              checkbookType: cb.checkbook_type,
+                            })
+                            setChequeOpen(true)
+                          }} className="text-blue-600 hover:underline font-medium">
+                            Emitir cheque →
+                          </button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Links a módulos relacionados */}
       <div className="flex gap-3 text-xs text-slate-400 flex-wrap">
         <span>Ver también:</span>
@@ -710,10 +864,38 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
             <input type="text" value={naName} onChange={e => setNaName(e.target.value)}
-              placeholder={naType === 'caja' ? 'Ej: Caja Sucursal Norte' : 'Ej: Banco Galicia CC 123456'}
+              placeholder={naType === 'caja' ? 'Ej: Caja Principal' : 'Ej: Banco Galicia'}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {/* Campos adicionales para banco */}
+          {naType === 'banco' && (
+            <div className="space-y-3 border border-blue-100 rounded-xl p-3 bg-blue-50">
+              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Datos bancarios</p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de cuenta</label>
+                <select value={naBankType} onChange={e => setNaBankType(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500">
+                  {BANK_ACCOUNT_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Número de cuenta</label>
+                <input type="text" value={naAccNumber} onChange={e => setNaAccNumber(e.target.value)}
+                  placeholder="Ej: 0010203040 / 052 — opcional"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {naBankType === 'cuenta_corriente' && (
+                <p className="text-xs text-blue-600">
+                  💡 Las cuentas corrientes pueden tener chequeras. Podés agregarlas después desde la sección "Chequeras".
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Saldo inicial (ARS)</label>
@@ -733,6 +915,140 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
             <Button onClick={saveNewAccount} loading={naSaving} className="flex-1">Crear cuenta</Button>
           </div>
         </div>
+      </Modal>
+
+      {/* ═══ MODAL NUEVA CHEQUERA ═══════════════════════════════════════ */}
+      <Modal open={checkbookOpen} onClose={() => setCheckbookOpen(false)} title={`Nueva chequera — ${cbAccountName}`}>
+        <div className="p-5 space-y-4">
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-r-lg text-xs text-blue-700">
+            💡 Una chequera es un talonario de cheques emitidos sobre la cuenta corriente. Registrá el rango de numeración para llevar el control de cheques emitidos.
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de cheque</label>
+            <div className="flex gap-2">
+              {(['comun', 'diferido'] as const).map(t => (
+                <button key={t} type="button" onClick={() => setCbType(t)}
+                  className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                    cbType === t ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                  }`}>
+                  {t === 'comun' ? '✏️ Común' : '📅 Diferido'}
+                  <p className="text-xs font-normal mt-0.5 opacity-70">
+                    {t === 'comun' ? 'Cobro inmediato' : 'Cobro a fecha futura'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta bancaria</label>
+            <select value={cbAccountId} onChange={e => { const a = accounts.find(x => x.id === e.target.value); setCbAccountId(e.target.value); if(a) setCbAccountName(a.name) }}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500">
+              {accounts.filter(a => a.type === 'banco').map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nro. desde</label>
+              <input type="number" value={cbFrom} min="1" onChange={e => setCbFrom(e.target.value)}
+                placeholder="00000001"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 font-mono focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nro. hasta</label>
+              <input type="number" value={cbTo} min="1" onChange={e => setCbTo(e.target.value)}
+                placeholder="00000025"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 font-mono focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          {cbFrom && cbTo && parseInt(cbFrom) < parseInt(cbTo) && (
+            <p className="text-xs text-slate-500">
+              Chequera de {parseInt(cbTo) - parseInt(cbFrom) + 1} cheques
+              ({String(parseInt(cbFrom)).padStart(8,'0')} al {String(parseInt(cbTo)).padStart(8,'0')})
+            </p>
+          )}
+
+          {cbError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{cbError}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setCheckbookOpen(false)} className="flex-1">Cancelar</Button>
+            <Button onClick={saveCheckbook} loading={cbSaving} className="flex-1">Registrar chequera</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ═══ MODAL EMITIR CHEQUE ════════════════════════════════════════ */}
+      <Modal open={chequeOpen} onClose={() => setChequeOpen(false)} title="Emitir cheque">
+        {chequeData && (
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Beneficiario</label>
+                <input type="text" value={chequeData.beneficiary} placeholder="Nombre del beneficiario"
+                  onChange={e => setChequeData({ ...chequeData, beneficiary: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Importe</label>
+                <input type="number" value={chequeData.amount || ''} min="0" step="0.01"
+                  onChange={e => setChequeData({ ...chequeData, amount: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                {chequeData.checkbookType === 'diferido' ? 'Fecha de cobro (diferido)' : 'Fecha de emisión'}
+              </label>
+              <input type="date" value={chequeData.date}
+                onChange={e => setChequeData({ ...chequeData, date: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            {/* Vista previa del cheque */}
+            {chequeData.beneficiary && chequeData.amount > 0 && (
+              <div id="cheque-print" className="border-2 border-slate-700 rounded-xl p-4 bg-white space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Cheque {chequeData.checkbookType === 'diferido' ? 'de Pago Diferido' : 'Común'}</p>
+                    <p className="font-bold text-slate-800">{chequeData.accountName}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400">Nro.</p>
+                    <p className="font-bold font-mono text-slate-800">{String(chequeData.checkNumber).padStart(8,'0')}</p>
+                  </div>
+                </div>
+                <div className="border-t border-b border-slate-200 py-2 space-y-1.5 text-sm">
+                  <div className="flex gap-2">
+                    <span className="text-slate-500 w-24 flex-shrink-0">Páguese a:</span>
+                    <span className="font-semibold text-slate-800">{chequeData.beneficiary}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-slate-500 w-24 flex-shrink-0">La suma de:</span>
+                    <span className="font-semibold text-slate-800 font-mono">{formatCurrency(chequeData.amount)}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-slate-500 w-24 flex-shrink-0">
+                      {chequeData.checkbookType === 'diferido' ? 'Cobrar el:' : 'Fecha:'}
+                    </span>
+                    <span className="font-semibold text-slate-800">{chequeData.date}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 text-center">Documento educativo — no válido legalmente — EduERP 360</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => setChequeOpen(false)} className="flex-1">Cancelar</Button>
+              <Button onClick={() => window.print()} className="flex-1" disabled={!chequeData.beneficiary || !chequeData.amount}>
+                🖨️ Imprimir cheque
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* ═══ MODAL TRANSFERENCIA ════════════════════════════════════════ */}

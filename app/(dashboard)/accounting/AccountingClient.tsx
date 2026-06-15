@@ -263,6 +263,24 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
 
   return (
     <div>
+      {/* Banner apertura — visible si no hay asientos */}
+      {entries.length === 0 && (
+        <div className="mb-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex-1">
+            <p className="font-semibold text-blue-900 flex items-center gap-2">
+              <span className="text-xl">🏛️</span> Registrá el asiento de apertura
+            </p>
+            <p className="text-sm text-blue-700 mt-0.5">
+              El primer paso contable es registrar los aportes iniciales de los socios: efectivo, depósito bancario y mercaderías, con contrapartida en Capital Social.
+            </p>
+          </div>
+          <a href="/accounting/apertura"
+            className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+            📒 Asiento de apertura →
+          </a>
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex gap-0.5 border-b border-slate-200 mb-4 overflow-x-auto pb-px">
         {TABS.map(tab => (
