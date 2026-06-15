@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { updateStock } from '@/lib/inventory/stock'
-import { createSaleJournalEntry, getEntryExplanation } from '@/lib/accounting/entries'
+import { getEntryExplanation } from '@/lib/accounting/entries'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -192,22 +192,16 @@ export default function NewSalePage() {
       }
     }
 
-    // 5. Asiento contable
-    await createSaleJournalEntry(
-      { ...({} as any), id: sale.id, company_id: companyId, date, total, transaction_type: transactionType, iva_rate: ivaRate },
-      totalCost
-    )
-
-    // 6. Gamificación
+    // 5. Gamificación
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_SALE' })
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: transactionType === 'contado' ? 'CASH_SALE' : 'CREDIT_SALE' })
     await awardXp({ profileId: userId, companyId, amount: 20, reason: 'Venta registrada' })
 
-    // 7. Tip educativo
+    // 6. Tip educativo y redirección al comprobante
     setTip(getEntryExplanation(transactionType === 'contado' ? 'venta_contado' : 'venta_credito'))
     setSaving(false)
 
-    setTimeout(() => router.push('/sales'), 4000)
+    setTimeout(() => router.push(`/sales/${sale.id}`), 2500)
   }
 
   return (

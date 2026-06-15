@@ -27,7 +27,11 @@ export default function PaymentsPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [reciboOpen, setReciboOpen] = useState(false)
-  const [reciboData, setReciboData] = useState<{ supplierName: string; amount: number; date: string; paymentMethod: string; cashAccountName: string } | null>(null)
+  const [reciboData, setReciboData] = useState<{
+    supplierName: string; amount: number; date: string; paymentMethod: string
+    cashAccountName: string; paymentId: string; cashAccountType: string
+  } | null>(null)
+  const [reciboAccounting, setReciboAccounting] = useState<'idle' | 'loading' | 'done'>('idle')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -110,18 +114,6 @@ export default function PaymentsPage() {
       reference_type: 'payment', reference_id: payInsert?.id ?? null, created_by: userId,
     })
 
-    if (payInsert?.id) {
-      const selectedCash = cashAccounts.find((c: any) => c.id === cashAccountId)
-      await createPaymentJournalEntry({
-        companyId,
-        date: today,
-        amount,
-        paymentId: payInsert.id,
-        cashAccountType: selectedCash?.type ?? 'caja',
-        supplierName: selected.supplier?.name,
-      })
-    }
-
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_PAYMENT' })
     await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Pago registrado' })
 
@@ -130,15 +122,32 @@ export default function PaymentsPage() {
     setSaving(false)
 
     const selectedCashAccount = cashAccounts.find((c: any) => c.id === cashAccountId)
+    setReciboAccounting('idle')
     setReciboData({
       supplierName: selected.supplier?.name ?? '—',
       amount,
       date: today,
       paymentMethod,
       cashAccountName: selectedCashAccount?.name ?? '—',
+      paymentId: payInsert?.id ?? '',
+      cashAccountType: selectedCashAccount?.type ?? 'caja',
     })
     setReciboOpen(true)
     loadData()
+  }
+
+  async function registerPaymentAccounting() {
+    if (!reciboData || !companyId || reciboAccounting !== 'idle') return
+    setReciboAccounting('loading')
+    await createPaymentJournalEntry({
+      companyId,
+      date: reciboData.date,
+      amount: reciboData.amount,
+      paymentId: reciboData.paymentId,
+      cashAccountType: reciboData.cashAccountType,
+      supplierName: reciboData.supplierName,
+    })
+    setReciboAccounting('done')
   }
 
   function printRecibo() {
@@ -316,8 +325,8 @@ export default function PaymentsPage() {
       <Modal open={reciboOpen} onClose={() => setReciboOpen(false)} title="Pago registrado">
         <div className="p-5 space-y-4">
           <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-            <p className="font-bold text-green-800 text-lg">Pago exitoso</p>
-            <p className="text-green-700 text-sm mt-1">El asiento contable fue generado automáticamente.</p>
+            <p className="font-bold text-green-800 text-lg">Pago registrado</p>
+            <p className="text-green-700 text-sm mt-1">La operación fue guardada. Podés registrarla en contabilidad ahora.</p>
           </div>
           {reciboData && (
             <div className="space-y-2 text-sm">
@@ -331,9 +340,26 @@ export default function PaymentsPage() {
               </div>
             </div>
           )}
+          {/* Acción contable */}
+          <div className={`p-3 rounded-lg border text-sm ${reciboAccounting === 'done' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+            {reciboAccounting === 'done' ? (
+              <p className="font-medium">✓ Asiento contable registrado — Debe Proveedores / Haber Caja/Banco</p>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-slate-500">Asiento contable: pendiente</span>
+                <Button
+                  size="sm"
+                  onClick={registerPaymentAccounting}
+                  loading={reciboAccounting === 'loading'}
+                >
+                  Registrar asiento
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={printRecibo} className="flex-1">Imprimir recibo</Button>
-            <Button onClick={() => setReciboOpen(false)} className="flex-1">Cerrar</Button>
+            <Button variant="outline" onClick={() => setReciboOpen(false)} className="flex-1">Cerrar</Button>
           </div>
         </div>
       </Modal>

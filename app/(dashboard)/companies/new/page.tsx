@@ -27,6 +27,7 @@ export default function NewCompanyPage() {
   const [address, setAddress] = useState('')
   const [initialCash, setInitialCash] = useState(50000)
   const [initialBank, setInitialBank] = useState(100000)
+  const [iibbRate, setIibbRate] = useState(0.03)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -45,6 +46,7 @@ export default function NewCompanyPage() {
         sector,
         cuit,
         address,
+        iibb_rate: iibbRate,
         owner_id: user.id,
         sim_start_date: new Date().toISOString().split('T')[0],
       })
@@ -197,6 +199,31 @@ export default function NewCompanyPage() {
                 onChange={(e) => setInitialBank(Number(e.target.value))}
                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Alícuota Ingresos Brutos</label>
+              <p className="text-xs text-slate-400 mb-2">Varía según la provincia y la actividad. Se aplica sobre el neto de ventas (sin IVA).</p>
+              <div className="flex gap-2">
+                {[
+                  { value: 0.03,  label: '3%',     desc: 'Bs. As. / CABA' },
+                  { value: 0.035, label: '3.5%',   desc: 'Córdoba' },
+                  { value: 0.02,  label: '2%',     desc: 'Reducida' },
+                  { value: 0,     label: 'Exento', desc: 'Sin IIBB' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setIibbRate(opt.value)}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors text-center ${
+                      iibbRate === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div>{opt.label}</div>
+                    <div className="text-xs font-normal opacity-70">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Resumen */}

@@ -11,6 +11,8 @@ interface AccountMap {
   costo_venta: string
   iva_credito: string
   iva_debito: string
+  iibb_gasto: string
+  iibb_pagar: string
 }
 
 export async function getAccountMap(companyId: string): Promise<AccountMap | null> {
@@ -19,7 +21,7 @@ export async function getAccountMap(companyId: string): Promise<AccountMap | nul
     .from('chart_of_accounts')
     .select('id, code')
     .eq('company_id', companyId)
-    .in('code', ['1.1.1', '1.1.2', '1.1.3', '1.2.1', '2.1.1', '3.1.1', '4.1.1', '5.1.1', '1.1.11', '2.1.5'])
+    .in('code', ['1.1.1', '1.1.2', '1.1.3', '1.2.1', '2.1.1', '3.1.1', '4.1.1', '5.1.1', '1.1.11', '2.1.5', '5.3.14', '2.1.8'])
 
   if (!data || data.length === 0) return null
   const find = (code: string) => data.find((a) => a.code === code)?.id ?? ''
@@ -34,6 +36,8 @@ export async function getAccountMap(companyId: string): Promise<AccountMap | nul
     costo_venta: find('5.1.1'),
     iva_credito: find('1.1.11'),
     iva_debito:  find('2.1.5'),
+    iibb_gasto:  find('5.3.14'),
+    iibb_pagar:  find('2.1.8'),
   }
 }
 
@@ -92,6 +96,7 @@ export async function createPurchaseJournalEntry(
 interface SaleRef {
   id: string; company_id: string; date: string; total: number; transaction_type: string
   iva_rate?: number
+  iibb_rate?: number
 }
 
 export async function createSaleJournalEntry(
@@ -131,6 +136,16 @@ export async function createSaleJournalEntry(
 
   if (ivaAmount > 0 && accounts.iva_debito) {
     lines.push({ journal_entry_id: entry.id, account_id: accounts.iva_debito, debit: 0, credit: ivaAmount, description: 'IVA Débito Fiscal' })
+  }
+
+  // IIBB se calcula sobre la base imponible (neto sin IVA)
+  const iibbRate   = sale.iibb_rate ?? 0
+  const iibbAmount = iibbRate > 0 ? Math.round(netAmount * iibbRate * 100) / 100 : 0
+  if (iibbAmount > 0 && accounts.iibb_gasto && accounts.iibb_pagar) {
+    lines.push(
+      { journal_entry_id: entry.id, account_id: accounts.iibb_gasto, debit: iibbAmount, credit: 0, description: `IIBB ${(iibbRate * 100).toFixed(1)}% s/base imponible` },
+      { journal_entry_id: entry.id, account_id: accounts.iibb_pagar, debit: 0, credit: iibbAmount, description: 'IIBB a pagar (organismo provincial)' },
+    )
   }
 
   if (totalCost > 0) {

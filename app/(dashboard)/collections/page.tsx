@@ -27,7 +27,11 @@ export default function CollectionsPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [reciboOpen, setReciboOpen] = useState(false)
-  const [reciboData, setReciboData] = useState<{ customerName: string; amount: number; date: string; paymentMethod: string; cashAccountName: string } | null>(null)
+  const [reciboData, setReciboData] = useState<{
+    customerName: string; amount: number; date: string; paymentMethod: string
+    cashAccountName: string; collectionId: string; cashAccountType: string
+  } | null>(null)
+  const [reciboAccounting, setReciboAccounting] = useState<'idle' | 'loading' | 'done'>('idle')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -108,18 +112,6 @@ export default function CollectionsPage() {
       reference_type: 'collection', reference_id: collInsert?.id ?? null, created_by: userId,
     })
 
-    if (collInsert?.id) {
-      const selectedCash = cashAccounts.find((c: any) => c.id === cashAccountId)
-      await createCollectionJournalEntry({
-        companyId,
-        date: today,
-        amount,
-        collectionId: collInsert.id,
-        cashAccountType: selectedCash?.type ?? 'caja',
-        customerName: selected.customer?.name,
-      })
-    }
-
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_COLLECTION' })
     await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Cobro registrado' })
 
@@ -128,15 +120,32 @@ export default function CollectionsPage() {
     setSaving(false)
 
     const selectedCashAccount = cashAccounts.find((c: any) => c.id === cashAccountId)
+    setReciboAccounting('idle')
     setReciboData({
       customerName: selected.customer?.name ?? '—',
       amount,
       date: today,
       paymentMethod,
       cashAccountName: selectedCashAccount?.name ?? '—',
+      collectionId: collInsert?.id ?? '',
+      cashAccountType: selectedCashAccount?.type ?? 'caja',
     })
     setReciboOpen(true)
     loadData()
+  }
+
+  async function registerCollectionAccounting() {
+    if (!reciboData || !companyId || reciboAccounting !== 'idle') return
+    setReciboAccounting('loading')
+    await createCollectionJournalEntry({
+      companyId,
+      date: reciboData.date,
+      amount: reciboData.amount,
+      collectionId: reciboData.collectionId,
+      cashAccountType: reciboData.cashAccountType,
+      customerName: reciboData.customerName,
+    })
+    setReciboAccounting('done')
   }
 
   function printRecibo() {
@@ -315,8 +324,8 @@ export default function CollectionsPage() {
       <Modal open={reciboOpen} onClose={() => setReciboOpen(false)} title="Cobro registrado">
         <div className="p-5 space-y-4">
           <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-            <p className="font-bold text-green-800 text-lg">Cobro exitoso</p>
-            <p className="text-green-700 text-sm mt-1">El asiento contable fue generado automáticamente.</p>
+            <p className="font-bold text-green-800 text-lg">Cobro registrado</p>
+            <p className="text-green-700 text-sm mt-1">La operación fue guardada. Podés registrarla en contabilidad ahora.</p>
           </div>
           {reciboData && (
             <div className="space-y-2 text-sm">
@@ -330,9 +339,26 @@ export default function CollectionsPage() {
               </div>
             </div>
           )}
+          {/* Acción contable */}
+          <div className={`p-3 rounded-lg border text-sm ${reciboAccounting === 'done' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+            {reciboAccounting === 'done' ? (
+              <p className="font-medium">✓ Asiento contable registrado — Debe Caja/Banco / Haber Clientes</p>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-slate-500">Asiento contable: pendiente</span>
+                <Button
+                  size="sm"
+                  onClick={registerCollectionAccounting}
+                  loading={reciboAccounting === 'loading'}
+                >
+                  Registrar asiento
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={printRecibo} className="flex-1">Imprimir recibo</Button>
-            <Button onClick={() => setReciboOpen(false)} className="flex-1">Cerrar</Button>
+            <Button variant="outline" onClick={() => setReciboOpen(false)} className="flex-1">Cerrar</Button>
           </div>
         </div>
       </Modal>

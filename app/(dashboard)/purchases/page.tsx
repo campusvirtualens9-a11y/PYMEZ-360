@@ -15,12 +15,20 @@ export default async function PurchasesPage() {
     .order('created_at', { ascending: false }).limit(1).single()
   if (!company) redirect('/companies/new')
 
-  const { data: purchases } = await supabase
-    .from('purchases')
-    .select('*, supplier:suppliers(name, balance), items:purchase_items(id)')
-    .eq('company_id', company.id)
-    .order('date', { ascending: false })
+  const [{ data: purchases }, { data: journalRefs }] = await Promise.all([
+    supabase
+      .from('purchases')
+      .select('*, supplier:suppliers(name, balance), items:purchase_items(id)')
+      .eq('company_id', company.id)
+      .order('date', { ascending: false }),
+    supabase
+      .from('journal_entries')
+      .select('reference_id')
+      .eq('company_id', company.id)
+      .eq('reference_type', 'purchase'),
+  ])
 
+  const accountedIds = new Set((journalRefs ?? []).map((j: any) => j.reference_id))
   const all         = purchases ?? []
   const totalMonto  = all.reduce((s: number, p: any) => s + Number(p.total), 0)
   const pending     = all.filter((p: any) => p.status === 'pendiente')
@@ -100,6 +108,7 @@ export default async function PurchasesPage() {
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Tipo</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total</th>
                   <th className="text-center px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Estado</th>
+                  <th className="text-center px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Contabilidad</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Acción</th>
                 </tr>
               </thead>
@@ -114,6 +123,13 @@ export default async function PurchasesPage() {
                       <Badge variant={p.status === 'pagado' ? 'success' : p.status === 'cancelado' ? 'danger' : 'warning'}>
                         {p.status}
                       </Badge>
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      {accountedIds.has(p.id) ? (
+                        <span className="text-xs text-green-600 font-medium">✓ Registrado</span>
+                      ) : (
+                        <span className="text-xs text-amber-500">Pendiente</span>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
