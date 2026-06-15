@@ -200,7 +200,7 @@ export default function ProductsPage() {
         <div className="p-5 space-y-4">
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Código *</label>
               <input type="text" value={form.code} onChange={f('code')}

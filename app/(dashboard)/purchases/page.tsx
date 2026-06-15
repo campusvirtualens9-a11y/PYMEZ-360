@@ -57,7 +57,7 @@ export default async function PurchasesPage() {
         💡 <strong>Circuito de compra:</strong> Elegís el proveedor, los productos y el tipo de pago. Si pagás de contado, el dinero sale de caja/banco. Si es a cuenta corriente, queda registrada la deuda con el proveedor. En ambos casos, el stock aumenta automáticamente.
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent>
             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total comprado</p>
@@ -100,7 +100,8 @@ export default async function PurchasesPage() {
               <Link href="/purchases/new"><Button size="sm" className="mt-4">Registrar primera compra</Button></Link>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Fecha</th>
@@ -149,6 +150,7 @@ export default async function PurchasesPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -48,7 +48,7 @@ export default async function InventoryPage() {
         💡 <strong>¿Qué es el inventario?</strong> Muestra la cantidad disponible de cada producto. El stock se actualiza automáticamente con cada compra (sube) y cada venta (baja). Cuando el stock llega al mínimo, aparece una alerta para reponer mercadería.
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent>
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total productos</p>
           <p className="text-2xl font-bold text-slate-800">{all.length}</p>

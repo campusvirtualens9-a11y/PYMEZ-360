@@ -385,7 +385,7 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
       {/* ── KPIs del período ──────────────────────────────────────────── */}
       <div>
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-3">Flujo del período filtrado</h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card>
             <CardContent>
               <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Ingresado</p>

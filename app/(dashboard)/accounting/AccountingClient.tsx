@@ -665,7 +665,7 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
       {activeTab === 'iva' && (
         <div className="space-y-4">
           {/* Resumen posición fiscal */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
               <CardContent>
                 <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">IVA Débito (ventas)</p>

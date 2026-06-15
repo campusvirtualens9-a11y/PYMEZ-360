@@ -85,7 +85,7 @@ export default function TaxesPage() {
 
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
           <p className="font-semibold mb-1">Calendario IIBB Misiones — ejemplo mes corriente</p>
-          <div className="grid grid-cols-3 gap-3 mt-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2 text-xs">
             <div className="bg-white rounded-lg p-3 border border-amber-100">
               <p className="font-semibold text-amber-700">Enero</p>
               <p>DDJJ ingresos enero</p>
@@ -162,7 +162,7 @@ export default function TaxesPage() {
             <div className="relative">
               {/* línea horizontal */}
               <div className="absolute top-5 left-0 right-0 h-0.5 bg-blue-100" />
-              <div className="grid grid-cols-4 gap-3 relative">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 relative">
                 <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 text-center">
                   <div className="w-4 h-4 bg-blue-500 rounded-full mx-auto mb-2" />
                   <p className="text-xs font-semibold text-blue-700">Ene – Oct</p>

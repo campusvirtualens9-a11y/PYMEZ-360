@@ -198,7 +198,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* KPIs rápidos */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card><CardContent>
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total a pagar</p>
           <p className="text-xl font-bold text-red-600">{formatCurrency(totalPendiente)}</p>
@@ -242,7 +242,8 @@ export default function PaymentsPage() {
               </p>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Proveedor</th>
@@ -274,6 +275,7 @@ export default function PaymentsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

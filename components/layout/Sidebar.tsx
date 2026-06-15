@@ -34,14 +34,26 @@ type NavItem = {
   divider?: boolean
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  open?: boolean
+  onClose?: () => void
+}
+
+export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed top-0 left-0 h-full w-[260px] bg-[#0f172a] text-slate-300 flex flex-col z-30 shadow-xl">
+    <aside
+      className={cn(
+        'fixed top-0 left-0 h-full w-[260px] bg-[#0f172a] text-slate-300 flex flex-col z-50 shadow-xl transition-transform duration-300',
+        // mobile: slide in/out; desktop: always visible
+        open ? 'translate-x-0' : '-translate-x-full',
+        'lg:translate-x-0',
+      )}
+    >
       {/* Logo */}
-      <div className="p-5 border-b border-slate-700">
-        <Link href="/dashboard" className="flex items-center gap-3">
+      <div className="p-5 border-b border-slate-700 flex items-center justify-between">
+        <Link href="/dashboard" className="flex items-center gap-3" onClick={onClose}>
           <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow">
             E
           </div>
@@ -50,6 +62,14 @@ export function Sidebar() {
             <div className="text-slate-500 text-xs">Gestión Educativa</div>
           </div>
         </Link>
+        {/* Botón cerrar en mobile */}
+        <button
+          onClick={onClose}
+          className="lg:hidden text-slate-400 hover:text-white p-1 rounded"
+          aria-label="Cerrar menú"
+        >
+          ✕
+        </button>
       </div>
 
       {/* Navegación */}
@@ -63,6 +83,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href!}
+              onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mb-0.5',
                 isActive

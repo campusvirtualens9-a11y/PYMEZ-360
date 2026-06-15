@@ -57,7 +57,7 @@ export default async function SalesPage() {
         💡 <strong>Circuito de venta:</strong> Elegís el cliente, los productos y si cobrás de contado o a cuenta corriente. De contado, el dinero entra a caja/banco ahora. A crédito, generás una cuenta a cobrar. En ambos casos, el stock se descuenta automáticamente.
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent>
             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total vendido</p>
@@ -100,7 +100,8 @@ export default async function SalesPage() {
               <Link href="/sales/new"><Button size="sm" className="mt-4">Registrar primera venta</Button></Link>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Fecha</th>
@@ -149,6 +150,7 @@ export default async function SalesPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>
