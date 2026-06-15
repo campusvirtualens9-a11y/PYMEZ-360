@@ -112,8 +112,10 @@ export default async function ReportsPage() {
         </Card>
       </div>
 
-      <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-        📄 <strong>Próximamente:</strong> Exportación a PDF y CSV, gráficos de evolución, flujo de fondos mensual, libro mayor por cuenta y balance de sumas y saldos completo.
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+        📑 <strong>Exportar libros y DDJJ:</strong>{' '}
+        Descargá el Libro Diario, Balance de Sumas y Saldos, Libros IVA, Estado de Resultados y las declaraciones juradas para ARCA e IIBB Misiones desde{' '}
+        <a href="/exports" className="underline font-semibold">Exportar</a>.
       </div>
     </div>
   )

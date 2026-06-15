@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { href: '/accounting',    icon: '📒', label: 'Contabilidad'    },
   { href: '/taxes',         icon: '🧾', label: 'Impuestos'       },
   { href: '/reports',       icon: '📈', label: 'Reportes'        },
+  { href: '/exports',       icon: '📑', label: 'Exportar'         },
   { divider: true },
   { href: '/gamification',  icon: '🎮', label: 'Desafíos'        },
   { href: '/exam',          icon: '🎓', label: 'Examen Final'    },
