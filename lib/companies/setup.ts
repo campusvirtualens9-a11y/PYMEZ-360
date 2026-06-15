@@ -138,6 +138,7 @@ const BASE_ACCOUNTS = [
   { code: '5.3.18', name: 'Capacitación y Formación del Personal',   type: 'egreso'     },
   { code: '5.3.19', name: 'Insumos Informáticos',                    type: 'egreso'     },
   { code: '5.3.20', name: 'Gastos de Seguridad',                     type: 'egreso'     },
+  { code: '5.3.21', name: 'Impuesto a las Ganancias',               type: 'egreso'     },
   // ── EGRESOS ─ Gastos Financieros ─────────────────────────────────────
   { code: '5.4.1',  name: 'Intereses Pagados',                       type: 'egreso'     },
   { code: '5.4.2',  name: 'Descuentos Concedidos a Clientes',        type: 'egreso'     },

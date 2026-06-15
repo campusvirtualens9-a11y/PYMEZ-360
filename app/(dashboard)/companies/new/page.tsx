@@ -28,6 +28,7 @@ export default function NewCompanyPage() {
   const [initialCash, setInitialCash] = useState(50000)
   const [initialBank, setInitialBank] = useState(100000)
   const [iibbRate, setIibbRate] = useState(0.03)
+  const [iibbIdx,  setIibbIdx]  = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -202,21 +203,29 @@ export default function NewCompanyPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Alícuota Ingresos Brutos</label>
-              <p className="text-xs text-slate-400 mb-2">Varía según la provincia y la actividad. Se aplica sobre el neto de ventas (sin IVA).</p>
-              <div className="flex gap-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Alícuota Ingresos Brutos (IIBB)</label>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-xs text-blue-800 space-y-1">
+                <p><strong>Pago mensual</strong> — Se presenta una Declaración Jurada (DDJJ) ante la Dirección General de Rentas (DGR) de cada provincia.</p>
+                <p>La base imponible son los <strong>ingresos netos sin IVA</strong> del mes. Vence generalmente el <strong>25 de cada mes</strong>.</p>
+                <p className="text-blue-600">→ Misiones: se paga vía DGR Misiones (dgr.misiones.gov.ar) o bancos habilitados.</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { value: 0.03,  label: '3%',     desc: 'Bs. As. / CABA' },
-                  { value: 0.035, label: '3.5%',   desc: 'Córdoba' },
-                  { value: 0.02,  label: '2%',     desc: 'Reducida' },
-                  { value: 0,     label: 'Exento', desc: 'Sin IIBB' },
-                ].map((opt) => (
+                  { value: 0.03,  label: '3%',      desc: 'Misiones (DGR)' },
+                  { value: 0.03,  label: '3%',      desc: 'Bs. As. / CABA' },
+                  { value: 0.035, label: '3.5%',    desc: 'Córdoba' },
+                  { value: 0.02,  label: '2%',      desc: 'Reducida' },
+                  { value: 0.015, label: '1.5%',    desc: 'Actividad reducida' },
+                  { value: 0,     label: 'Exento',  desc: 'Sin IIBB' },
+                ].map((opt, idx) => (
                   <button
-                    key={opt.value}
+                    key={idx}
                     type="button"
-                    onClick={() => setIibbRate(opt.value)}
-                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors text-center ${
-                      iibbRate === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                    onClick={() => { setIibbRate(opt.value); setIibbIdx(idx) }}
+                    className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors text-center ${
+                      iibbIdx === idx
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-300 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     <div>{opt.label}</div>

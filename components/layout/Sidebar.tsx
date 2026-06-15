@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: '/treasury',      icon: '🏦', label: 'Tesorería'       },
   { href: '/inventory',     icon: '📋', label: 'Inventario'      },
   { href: '/accounting',    icon: '📒', label: 'Contabilidad'    },
+  { href: '/taxes',         icon: '🧾', label: 'Impuestos'       },
   { href: '/reports',       icon: '📈', label: 'Reportes'        },
   { divider: true },
   { href: '/gamification',  icon: '🎮', label: 'Desafíos'        },

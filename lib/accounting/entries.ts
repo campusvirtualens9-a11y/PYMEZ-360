@@ -433,6 +433,33 @@ export const JOURNAL_TEMPLATES: JournalTemplate[] = [
       { accountCode: '1.1.1', accountName: 'Caja',                           side: 'haber', label: 'Pago en efectivo' },
     ],
   },
+  {
+    code: 'IIBB_MENSUAL',
+    title: 'Pago mensual IIBB (Misiones)',
+    description: 'Pago de la DDJJ mensual de Ingresos Brutos a la DGR Misiones. Vence el 25 de cada mes.',
+    lines: [
+      { accountCode: '2.1.8', accountName: 'Ingresos Brutos a Pagar',  side: 'debe',  label: 'Cancelación deuda IIBB' },
+      { accountCode: '1.1.2', accountName: 'Banco Cuenta Corriente',   side: 'haber', label: 'Pago bancario' },
+    ],
+  },
+  {
+    code: 'GANANCIAS_DEVENGAMIENTO',
+    title: 'Devengamiento mensual Ganancias',
+    description: 'Provisión mensual del Impuesto a las Ganancias (35% s/utilidad estimada). El gasto se devenga en el período aunque se pague después.',
+    lines: [
+      { accountCode: '5.3.21', accountName: 'Impuesto a las Ganancias',          side: 'debe',  label: 'Gasto del período' },
+      { accountCode: '2.1.9',  accountName: 'Impuesto a las Ganancias a Pagar',  side: 'haber', label: 'Provisión (deuda con AFIP)' },
+    ],
+  },
+  {
+    code: 'GANANCIAS_ANTICIPO',
+    title: 'Pago anticipo Ganancias (AFIP)',
+    description: 'Pago de anticipo mensual de Ganancias a AFIP. Los anticipos son adelantos del impuesto anual y se descuentan de la DDJJ al cierre del ejercicio.',
+    lines: [
+      { accountCode: '2.1.9',  accountName: 'Impuesto a las Ganancias a Pagar',  side: 'debe',  label: 'Anticipo pagado' },
+      { accountCode: '1.1.2',  accountName: 'Banco Cuenta Corriente',             side: 'haber', label: 'Pago bancario a AFIP' },
+    ],
+  },
 ]
 
 // ─── Transferencia entre cuentas de tesorería ──────────────────────────────
