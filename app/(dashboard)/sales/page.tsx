@@ -1,39 +1,63 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatCurrency, formatDate } from '@/utils/cn'
 
-export default async function SalesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+export default function SalesPage() {
+  const router = useRouter()
+  const supabase = createClient()
 
-  const { data: company } = await supabase.from('companies').select('id').eq('owner_id', user.id)
-    .order('created_at', { ascending: false }).limit(1).single()
-  if (!company) redirect('/companies/new')
+  const [sales, setSales] = useState<any[]>([])
+  const [accountedIds, setAccountedIds] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('todos')
 
-  const [{ data: sales }, { data: journalRefs }] = await Promise.all([
-    supabase
-      .from('sales')
-      .select('*, customer:customers(name), items:sale_items(id)')
-      .eq('company_id', company.id)
-      .order('date', { ascending: false }),
-    supabase
-      .from('journal_entries')
-      .select('reference_id')
-      .eq('company_id', company.id)
-      .eq('reference_type', 'sale'),
-  ])
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/auth/login'); return }
 
-  const accountedIds = new Set((journalRefs ?? []).map((j: any) => j.reference_id))
-  const all        = sales ?? []
-  const totalMonto = all.reduce((s: number, p: any) => s + Number(p.total), 0)
-  const pending    = all.filter((p: any) => p.status === 'pendiente')
+      const { data: company } = await supabase.from('companies').select('id').eq('owner_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).single()
+      if (!company) { router.push('/companies/new'); return }
+
+      const [{ data: salesData }, { data: journalRefs }] = await Promise.all([
+        supabase.from('sales').select('*, customer:customers(name), items:sale_items(id)')
+          .eq('company_id', company.id).order('date', { ascending: false }),
+        supabase.from('journal_entries').select('reference_id')
+          .eq('company_id', company.id).eq('reference_type', 'sale'),
+      ])
+
+      setSales(salesData ?? [])
+      setAccountedIds(new Set((journalRefs ?? []).map((j: any) => j.reference_id)))
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const filtered = useMemo(() => {
+    return sales.filter(s => {
+      const matchSearch = !search.trim() || (s.customer?.name ?? '').toLowerCase().includes(search.toLowerCase())
+      const matchStatus = statusFilter === 'todos' || s.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [sales, search, statusFilter])
+
+  const totalMonto = sales.reduce((s: number, p: any) => s + Number(p.total), 0)
+  const pending    = sales.filter((p: any) => p.status === 'pendiente')
   const pendingAmt = pending.reduce((s: number, p: any) => s + Number(p.total), 0)
-  const collected  = all.filter((p: any) => p.status === 'cobrado')
+  const collected  = sales.filter((p: any) => p.status === 'cobrado')
+
+  const DOC_LETTER: Record<string, string> = { factura_a: 'A', factura_b: 'B', factura_c: 'C', nota_debito_a: 'ND-A', nota_debito_b: 'ND-B', nota_credito_a: 'NC-A', nota_credito_b: 'NC-B' }
+
+  if (loading) return <div className="p-8 text-center text-slate-400">Cargando ventas...</div>
 
   return (
     <div className="space-y-6">
@@ -62,7 +86,7 @@ export default async function SalesPage() {
           <CardContent>
             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total vendido</p>
             <p className="text-2xl font-bold text-slate-800">{formatCurrency(totalMonto)}</p>
-            <p className="text-xs text-slate-400 mt-1">{all.length} operaciones</p>
+            <p className="text-xs text-slate-400 mt-1">{sales.length} operaciones</p>
           </CardContent>
         </Card>
         <Card>
@@ -91,13 +115,45 @@ export default async function SalesPage() {
         </Card>
       </div>
 
+      {/* Barra de búsqueda y filtros */}
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por cliente..."
+          className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 w-56"
+        />
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="todos">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="cobrado">Cobrado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        {(search || statusFilter !== 'todos') && (
+          <button onClick={() => { setSearch(''); setStatusFilter('todos') }}
+            className="text-slate-400 hover:text-slate-600 text-sm">
+            × Limpiar
+          </button>
+        )}
+        <span className="text-xs text-slate-400 ml-auto">{filtered.length} de {sales.length} ventas</span>
+      </div>
+
       <Card>
         <CardContent className="p-0">
-          {all.length === 0 ? (
+          {sales.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-2">💰</div>
               <p className="text-slate-500 text-sm">Aún no hay ventas registradas.</p>
               <Link href="/sales/new"><Button size="sm" className="mt-4">Registrar primera venta</Button></Link>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-10 text-center text-slate-400 text-sm">
+              Sin resultados para los filtros aplicados.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -115,8 +171,7 @@ export default async function SalesPage() {
                 </tr>
               </thead>
               <tbody>
-                {all.map((s: any) => {
-                  const DOC_LETTER: Record<string, string> = { factura_a: 'A', factura_b: 'B', factura_c: 'C', nota_debito_a: 'ND-A', nota_debito_b: 'ND-B', nota_credito_a: 'NC-A', nota_credito_b: 'NC-B' }
+                {filtered.map((s: any) => {
                   const letter = DOC_LETTER[s.document_type ?? 'factura_b'] ?? 'B'
                   const nro = s.doc_number ? `0001-${String(s.doc_number).padStart(8, '0')}` : '—'
                   return (

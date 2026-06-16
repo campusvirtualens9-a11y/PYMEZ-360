@@ -211,6 +211,19 @@ export default function PaymentsPage() {
   const totalPendiente = payables.reduce((s, p) => s + Number(p.pending_amount), 0)
   const totalOriginal  = payables.reduce((s, p) => s + Number(p.original_amount), 0)
 
+  function dueBadge(dueDate: string | null) {
+    if (!dueDate) return <span className="text-xs text-slate-400">—</span>
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const due = new Date(dueDate + 'T00:00:00')
+    const diff = Math.ceil((due.getTime() - today.getTime()) / 86400000)
+    if (diff < 0) return <span className="inline-block text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Vencido {Math.abs(diff)}d</span>
+    if (diff === 0) return <span className="inline-block text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Vence hoy</span>
+    if (diff <= 3) return <span className="inline-block text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">En {diff}d</span>
+    return <span className="text-xs text-slate-500">{formatDate(dueDate)}</span>
+  }
+
+  const overdueCount = payables.filter(p => p.due_date && new Date(p.due_date + 'T00:00:00') < new Date(new Date().toDateString())).length
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
@@ -231,7 +244,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* KPIs rápidos */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card><CardContent>
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total a pagar</p>
           <p className="text-xl font-bold text-red-600">{formatCurrency(totalPendiente)}</p>
@@ -243,6 +256,11 @@ export default function PaymentsPage() {
         <Card><CardContent>
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Pagado parcialmente</p>
           <p className="text-xl font-bold text-blue-700">{formatCurrency(totalOriginal - totalPendiente)}</p>
+        </CardContent></Card>
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Vencidas</p>
+          <p className={`text-xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-slate-800'}`}>{overdueCount}</p>
+          <p className="text-xs text-slate-400 mt-0.5">{overdueCount > 0 ? 'requieren atención' : 'sin vencidas'}</p>
         </CardContent></Card>
       </div>
 
@@ -284,28 +302,31 @@ export default function PaymentsPage() {
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Total compra</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Pendiente</th>
                   <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Estado</th>
+                  <th className="text-left px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Vencimiento</th>
                   <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Acción</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50">
+                {filtered.map((p) => {
+                  const isOverdue = p.due_date && new Date(p.due_date + 'T00:00:00') < new Date(new Date().toDateString())
+                  return (
+                  <tr key={p.id} className={`border-b border-slate-50 hover:bg-slate-50 ${isOverdue ? 'bg-red-50/40' : ''}`}>
                     <td className="px-5 py-3 font-medium text-slate-800">{p.supplier?.name ?? '—'}</td>
                     <td className="px-5 py-3 text-slate-500 text-xs">
-                      {p.purchase?.date ? (
-                        <span>Compra del {formatDate(p.purchase.date)}</span>
-                      ) : '—'}
+                      {p.purchase?.date ? <span>Compra del {formatDate(p.purchase.date)}</span> : '—'}
                     </td>
                     <td className="px-5 py-3 text-right text-slate-600">{formatCurrency(Number(p.original_amount))}</td>
                     <td className="px-5 py-3 text-right font-bold text-red-600">{formatCurrency(Number(p.pending_amount))}</td>
                     <td className="px-5 py-3">
                       <Badge variant={p.status === 'pagado_parcial' ? 'warning' : 'danger'}>{p.status?.replace('_', ' ')}</Badge>
                     </td>
+                    <td className="px-5 py-3">{dueBadge(p.due_date)}</td>
                     <td className="px-5 py-3 text-right">
                       <Button size="sm" variant="secondary" onClick={() => openPay(p)}>Pagar</Button>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             </div>

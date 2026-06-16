@@ -1,39 +1,63 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatCurrency, formatDate } from '@/utils/cn'
 
-export default async function PurchasesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+export default function PurchasesPage() {
+  const router = useRouter()
+  const supabase = createClient()
 
-  const { data: company } = await supabase.from('companies').select('id').eq('owner_id', user.id)
-    .order('created_at', { ascending: false }).limit(1).single()
-  if (!company) redirect('/companies/new')
+  const [purchases, setPurchases] = useState<any[]>([])
+  const [accountedIds, setAccountedIds] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('todos')
 
-  const [{ data: purchases }, { data: journalRefs }] = await Promise.all([
-    supabase
-      .from('purchases')
-      .select('*, supplier:suppliers(name, balance), items:purchase_items(id)')
-      .eq('company_id', company.id)
-      .order('date', { ascending: false }),
-    supabase
-      .from('journal_entries')
-      .select('reference_id')
-      .eq('company_id', company.id)
-      .eq('reference_type', 'purchase'),
-  ])
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/auth/login'); return }
 
-  const accountedIds = new Set((journalRefs ?? []).map((j: any) => j.reference_id))
-  const all         = purchases ?? []
-  const totalMonto  = all.reduce((s: number, p: any) => s + Number(p.total), 0)
-  const pending     = all.filter((p: any) => p.status === 'pendiente')
-  const pendingAmt  = pending.reduce((s: number, p: any) => s + Number(p.total), 0)
-  const paid        = all.filter((p: any) => p.status === 'pagado')
+      const { data: company } = await supabase.from('companies').select('id').eq('owner_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).single()
+      if (!company) { router.push('/companies/new'); return }
+
+      const [{ data: purchasesData }, { data: journalRefs }] = await Promise.all([
+        supabase.from('purchases').select('*, supplier:suppliers(name, balance), items:purchase_items(id)')
+          .eq('company_id', company.id).order('date', { ascending: false }),
+        supabase.from('journal_entries').select('reference_id')
+          .eq('company_id', company.id).eq('reference_type', 'purchase'),
+      ])
+
+      setPurchases(purchasesData ?? [])
+      setAccountedIds(new Set((journalRefs ?? []).map((j: any) => j.reference_id)))
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const filtered = useMemo(() => {
+    return purchases.filter(p => {
+      const matchSearch = !search.trim() || (p.supplier?.name ?? '').toLowerCase().includes(search.toLowerCase())
+      const matchStatus = statusFilter === 'todos' || p.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [purchases, search, statusFilter])
+
+  const totalMonto = purchases.reduce((s: number, p: any) => s + Number(p.total), 0)
+  const pending    = purchases.filter((p: any) => p.status === 'pendiente')
+  const pendingAmt = pending.reduce((s: number, p: any) => s + Number(p.total), 0)
+  const paid       = purchases.filter((p: any) => p.status === 'pagado')
+
+  const DOC_LETTER: Record<string, string> = { factura_a: 'A', factura_b: 'B', factura_c: 'C', nota_debito_a: 'ND-A', nota_credito_a: 'NC-A' }
+
+  if (loading) return <div className="p-8 text-center text-slate-400">Cargando compras...</div>
 
   return (
     <div className="space-y-6">
@@ -62,7 +86,7 @@ export default async function PurchasesPage() {
           <CardContent>
             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total comprado</p>
             <p className="text-2xl font-bold text-slate-800">{formatCurrency(totalMonto)}</p>
-            <p className="text-xs text-slate-400 mt-1">{all.length} operaciones</p>
+            <p className="text-xs text-slate-400 mt-1">{purchases.length} operaciones</p>
           </CardContent>
         </Card>
         <Card>
@@ -91,13 +115,45 @@ export default async function PurchasesPage() {
         </Card>
       </div>
 
+      {/* Barra de búsqueda y filtros */}
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por proveedor..."
+          className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 w-56"
+        />
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="todos">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="pagado">Pagado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        {(search || statusFilter !== 'todos') && (
+          <button onClick={() => { setSearch(''); setStatusFilter('todos') }}
+            className="text-slate-400 hover:text-slate-600 text-sm">
+            × Limpiar
+          </button>
+        )}
+        <span className="text-xs text-slate-400 ml-auto">{filtered.length} de {purchases.length} compras</span>
+      </div>
+
       <Card>
         <CardContent className="p-0">
-          {all.length === 0 ? (
+          {purchases.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-2">🛒</div>
               <p className="text-slate-500 text-sm">Aún no hay compras registradas.</p>
               <Link href="/purchases/new"><Button size="sm" className="mt-4">Registrar primera compra</Button></Link>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-10 text-center text-slate-400 text-sm">
+              Sin resultados para los filtros aplicados.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -115,8 +171,7 @@ export default async function PurchasesPage() {
                 </tr>
               </thead>
               <tbody>
-                {all.map((p: any) => {
-                  const DOC_LETTER: Record<string, string> = { factura_a: 'A', factura_b: 'B', factura_c: 'C', nota_debito_a: 'ND-A', nota_credito_a: 'NC-A' }
+                {filtered.map((p: any) => {
                   const letter = DOC_LETTER[p.document_type ?? 'factura_a'] ?? 'A'
                   const nro = p.doc_number ? `0001-${String(p.doc_number).padStart(8, '0')}` : '—'
                   return (
