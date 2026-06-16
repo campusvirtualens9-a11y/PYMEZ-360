@@ -131,17 +131,26 @@ export default function CollectionsPage() {
       reference_type: 'collection', reference_id: collInsert.id, created_by: userId,
     })
 
+    const selectedCashAccount = cashAccounts.find((c: any) => c.id === cashAccountId)
+    let journalDone = false
     try {
       await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_COLLECTION' })
       await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Cobro registrado' })
-    } catch { /* errors de gamificación no bloquean el flujo principal */ }
+      await createCollectionJournalEntry({
+        companyId,
+        date: today,
+        amount,
+        collectionId: collInsert.id,
+        cashAccountType: selectedCashAccount?.type ?? 'caja',
+        customerName: selected.customer?.name,
+      })
+      journalDone = true
+    } catch { /* errores no bloquean el flujo principal */ }
 
     setTip(getEntryExplanation('cobro'))
     setModalOpen(false)
     setSaving(false)
-
-    const selectedCashAccount = cashAccounts.find((c: any) => c.id === cashAccountId)
-    setReciboAccounting('idle')
+    setReciboAccounting(journalDone ? 'done' : 'idle')
     setReciboData({
       customerName: selected.customer?.name ?? '—',
       amount,

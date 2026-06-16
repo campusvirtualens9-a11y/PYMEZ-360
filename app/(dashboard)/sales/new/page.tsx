@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { updateStock } from '@/lib/inventory/stock'
-import { getEntryExplanation } from '@/lib/accounting/entries'
+import { createSaleJournalEntry, getEntryExplanation } from '@/lib/accounting/entries'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -48,6 +48,7 @@ export default function NewSalePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tip, setTip] = useState('')
+  const [companyIibbRate, setCompanyIibbRate] = useState(0)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -55,10 +56,11 @@ export default function NewSalePage() {
     setUserId(user.id)
 
     const { data: company } = await supabase
-      .from('companies').select('id').eq('owner_id', user.id)
+      .from('companies').select('id, iibb_rate').eq('owner_id', user.id)
       .order('created_at', { ascending: false }).limit(1).single()
     if (!company) return
     setCompanyId(company.id)
+    setCompanyIibbRate(Number(company.iibb_rate ?? 0))
 
     const [{ data: cust }, { data: prod }, { data: cash }] = await Promise.all([
       supabase.from('customers').select('*').eq('company_id', company.id).order('name'),
@@ -226,12 +228,20 @@ export default function NewSalePage() {
       }
     }
 
-    // 5. Gamificación
+    // 5. Asiento contable automático
+    try {
+      await createSaleJournalEntry(
+        { id: sale.id, company_id: companyId, date, total, transaction_type: transactionType, iva_rate: ivaRate, iibb_rate: companyIibbRate },
+        totalCost
+      )
+    } catch { /* se puede registrar manualmente desde el comprobante */ }
+
+    // 6. Gamificación
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_SALE' })
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: transactionType === 'contado' ? 'CASH_SALE' : 'CREDIT_SALE' })
     await awardXp({ profileId: userId, companyId, amount: 20, reason: 'Venta registrada' })
 
-    // 6. Tip educativo y redirección al comprobante
+    // 7. Tip educativo y redirección al comprobante
     setTip(getEntryExplanation(transactionType === 'contado' ? 'venta_contado' : 'venta_credito'))
     setSaving(false)
 

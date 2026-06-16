@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { updateStock } from '@/lib/inventory/stock'
-import { getEntryExplanation } from '@/lib/accounting/entries'
+import { createPurchaseJournalEntry, getEntryExplanation } from '@/lib/accounting/entries'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -222,12 +222,20 @@ export default function NewPurchasePage() {
       }
     }
 
-    // 5. Gamificación
+    // 5. Asiento contable automático
+    try {
+      await createPurchaseJournalEntry(
+        { id: purchase.id, company_id: companyId, date, total, transaction_type: transactionType, iva_rate: ivaRate },
+        transactionType === 'contado' ? cashAccountId : null
+      )
+    } catch { /* se puede registrar manualmente desde el comprobante */ }
+
+    // 6. Gamificación
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_PURCHASE' })
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: transactionType === 'contado' ? 'CASH_PURCHASE' : 'CREDIT_PURCHASE' })
     await awardXp({ profileId: userId, companyId, amount: 15, reason: 'Compra registrada' })
 
-    // 6. Tip educativo y redirección al comprobante
+    // 7. Tip educativo y redirección al comprobante
     setTip(getEntryExplanation(transactionType === 'contado' ? 'compra_contado' : 'compra_credito'))
     setSaving(false)
 

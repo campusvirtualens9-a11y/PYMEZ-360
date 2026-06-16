@@ -17,6 +17,9 @@ export default function SaleComprobantePage() {
   const [registering, setRegistering] = useState(false)
   const [registered, setRegistered] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelConfirm, setCancelConfirm] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -70,6 +73,84 @@ export default function SaleComprobantePage() {
     setHasEntry(true)
     setRegistered(true)
     setRegistering(false)
+  }
+
+  async function cancelSale() {
+    if (!sale || cancelling || sale.status === 'cancelado') return
+    setCancelling(true)
+    setCancelError(null)
+
+    const { data: receivable } = await supabase
+      .from('receivables').select('id, pending_amount, original_amount, customer_id, status')
+      .eq('sale_id', sale.id).maybeSingle()
+
+    if (receivable && receivable.status !== 'pendiente') {
+      setCancelError('No se puede anular: hay cobros registrados sobre esta venta. Anulá los cobros primero.')
+      setCancelling(false)
+      return
+    }
+
+    const { data: items } = await supabase
+      .from('sale_items').select('product_id, quantity, cost_price').eq('sale_id', sale.id)
+
+    if (items) {
+      for (const item of items) {
+        await supabase.from('stock_movements').insert({
+          company_id: sale.company_id, product_id: item.product_id,
+          date: new Date().toISOString().split('T')[0], type: 'entrada',
+          quantity: Number(item.quantity), unit_cost: Number(item.cost_price ?? 0),
+          reason: `Anulación venta${sale.doc_number ? ' #' + String(sale.doc_number).padStart(8, '0') : ''}`,
+          reference_type: 'sale_cancellation', reference_id: sale.id,
+        })
+        const { data: prod } = await supabase.from('products').select('stock_current').eq('id', item.product_id).single()
+        if (prod) {
+          await supabase.from('products').update({ stock_current: Number(prod.stock_current) + Number(item.quantity) }).eq('id', item.product_id)
+        }
+      }
+    }
+
+    if (sale.transaction_type === 'contado' && sale.cash_account_id) {
+      const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', sale.cash_account_id).single()
+      if (acct) {
+        await supabase.from('cash_accounts').update({ balance: Number(acct.balance) - Number(sale.total) }).eq('id', sale.cash_account_id)
+      }
+      await supabase.from('cash_movements').insert({
+        company_id: sale.company_id, cash_account_id: sale.cash_account_id,
+        date: new Date().toISOString().split('T')[0], type: 'egreso', amount: Number(sale.total),
+        concept: `Anulación venta — ${sale.customer?.name ?? 'cliente'}`,
+        reference_type: 'sale_cancellation', reference_id: sale.id,
+      })
+    } else if (sale.transaction_type === 'cuenta_corriente' && receivable) {
+      await supabase.from('receivables').update({ pending_amount: 0, status: 'cobrado' }).eq('id', receivable.id)
+      const { data: cust } = await supabase.from('customers').select('balance').eq('id', receivable.customer_id).single()
+      if (cust) {
+        await supabase.from('customers').update({ balance: Math.max(0, Number(cust.balance) - Number(receivable.original_amount)) }).eq('id', receivable.customer_id)
+      }
+    }
+
+    const { data: entries } = await supabase.from('journal_entries').select('id')
+      .eq('reference_type', 'sale').eq('reference_id', sale.id).limit(1)
+    if (entries && entries.length > 0) {
+      const { data: lines } = await supabase.from('journal_entry_lines')
+        .select('account_id, debit, credit, description').eq('journal_entry_id', entries[0].id)
+      if (lines && lines.length > 0) {
+        const { data: rev } = await supabase.from('journal_entries').insert({
+          company_id: sale.company_id, date: new Date().toISOString().split('T')[0],
+          description: `Anulación: ${sale.customer?.name ?? 'venta'} — Asiento de reversión`,
+          entry_type: 'automatico', reference_type: 'sale_cancellation', reference_id: sale.id,
+        }).select('id').single()
+        if (rev) {
+          await supabase.from('journal_entry_lines').insert(
+            lines.map((l: any) => ({ journal_entry_id: rev.id, account_id: l.account_id, debit: Number(l.credit), credit: Number(l.debit), description: `[Reversión] ${l.description ?? ''}` }))
+          )
+        }
+      }
+    }
+
+    const { error: cancelErr } = await supabase.from('sales').update({ status: 'cancelado' }).eq('id', sale.id)
+    setCancelling(false)
+    setCancelConfirm(false)
+    if (cancelErr) { setCancelError('Error al anular. Recargá la página.') } else { load() }
   }
 
   if (loading) return <div className="p-8 text-center text-slate-400">Cargando comprobante...</div>
@@ -131,8 +212,41 @@ export default function SaleComprobantePage() {
           >
             Imprimir comprobante
           </button>
+
+          {sale.status !== 'cancelado' && !cancelConfirm && (
+            <button
+              onClick={() => setCancelConfirm(true)}
+              className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 text-sm rounded-lg hover:bg-red-100 font-medium"
+            >
+              Anular venta
+            </button>
+          )}
         </div>
       </div>
+
+      {cancelConfirm && (
+        <div className="no-print mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-sm font-semibold text-red-800 mb-1">¿Confirmar anulación?</p>
+          <p className="text-xs text-red-700 mb-3">Esta acción revierte el stock, la tesorería o la cuenta corriente, y genera un asiento contable de reversión. No se puede deshacer.</p>
+          {cancelError && <p className="text-sm text-red-700 font-medium mb-3">{cancelError}</p>}
+          <div className="flex gap-2">
+            <button onClick={cancelSale} disabled={cancelling}
+              className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 font-medium disabled:opacity-60">
+              {cancelling ? 'Anulando...' : 'Confirmar anulación'}
+            </button>
+            <button onClick={() => { setCancelConfirm(false); setCancelError(null) }}
+              className="px-4 py-2 bg-white text-slate-600 border border-slate-300 text-sm rounded-lg hover:bg-slate-50 font-medium">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sale.status === 'cancelado' && (
+        <div className="no-print mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-semibold text-center">
+          ✕ Esta venta fue anulada — los efectos en stock, tesorería y contabilidad fueron revertidos
+        </div>
+      )}
 
       {registered && (
         <div className="no-print mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">

@@ -136,17 +136,26 @@ export default function PaymentsPage() {
       reference_type: 'payment', reference_id: payInsert.id, created_by: userId,
     })
 
+    const selectedCashAccount = cashAccounts.find((c: any) => c.id === cashAccountId)
+    let journalDone = false
     try {
       await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_PAYMENT' })
       await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Pago registrado' })
-    } catch { /* errors de gamificación no bloquean el flujo principal */ }
+      await createPaymentJournalEntry({
+        companyId,
+        date: today,
+        amount,
+        paymentId: payInsert.id,
+        cashAccountType: selectedCashAccount?.type ?? 'caja',
+        supplierName: selected.supplier?.name,
+      })
+      journalDone = true
+    } catch { /* errores no bloquean el flujo principal */ }
 
     setTip(getEntryExplanation('pago'))
     setModalOpen(false)
     setSaving(false)
-
-    const selectedCashAccount = cashAccounts.find((c: any) => c.id === cashAccountId)
-    setReciboAccounting('idle')
+    setReciboAccounting(journalDone ? 'done' : 'idle')
     setReciboData({
       supplierName: selected.supplier?.name ?? '—',
       amount,
