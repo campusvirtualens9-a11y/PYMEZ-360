@@ -32,6 +32,7 @@ export default function CollectionsPage() {
     cashAccountName: string; collectionId: string; cashAccountType: string
   } | null>(null)
   const [reciboAccounting, setReciboAccounting] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [collectError, setCollectError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -70,15 +71,17 @@ export default function CollectionsPage() {
     setSelected(recv)
     setAmount(Number(recv.pending_amount))
     setTip('')
+    setCollectError(null)
     setModalOpen(true)
   }
 
   async function handleCollect() {
     if (!selected || amount <= 0 || !cashAccountId || !companyId || !userId) return
     setSaving(true)
+    setCollectError(null)
 
     const today = new Date().toISOString().split('T')[0]
-    const { data: collInsert } = await supabase.from('collections').insert({
+    const { data: collInsert, error: insertErr } = await supabase.from('collections').insert({
       company_id: companyId,
       receivable_id: selected.id,
       customer_id: selected.customer_id,
@@ -89,11 +92,27 @@ export default function CollectionsPage() {
       created_by: userId,
     }).select('id').single()
 
+    if (insertErr || !collInsert) {
+      setSaving(false)
+      setCollectError('No se pudo registrar el cobro. Verificá tu conexión e intentá de nuevo.')
+      return
+    }
+
     const newPending = Number(selected.pending_amount) - amount
-    await supabase.from('receivables').update({
+    const { error: recvErr } = await supabase.from('receivables').update({
       pending_amount: Math.max(0, newPending),
       status: newPending <= 0 ? 'cobrado' : 'cobrado_parcial',
     }).eq('id', selected.id)
+
+    if (recvErr) {
+      setSaving(false)
+      setCollectError('El cobro se guardó pero no se pudo actualizar el estado. Recargá la página.')
+      return
+    }
+
+    if (newPending <= 0 && selected.sale_id) {
+      await supabase.from('sales').update({ status: 'cobrado' }).eq('id', selected.sale_id)
+    }
 
     const { data: cust } = await supabase.from('customers').select('balance').eq('id', selected.customer_id).single()
     if (cust) {
@@ -109,11 +128,13 @@ export default function CollectionsPage() {
       date: today,
       type: 'ingreso', amount,
       concept: `Cobro de ${selected.customer?.name ?? 'cliente'}`,
-      reference_type: 'collection', reference_id: collInsert?.id ?? null, created_by: userId,
+      reference_type: 'collection', reference_id: collInsert.id, created_by: userId,
     })
 
-    await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_COLLECTION' })
-    await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Cobro registrado' })
+    try {
+      await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_COLLECTION' })
+      await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Cobro registrado' })
+    } catch { /* errors de gamificación no bloquean el flujo principal */ }
 
     setTip(getEntryExplanation('cobro'))
     setModalOpen(false)
@@ -127,7 +148,7 @@ export default function CollectionsPage() {
       date: today,
       paymentMethod,
       cashAccountName: selectedCashAccount?.name ?? '—',
-      collectionId: collInsert?.id ?? '',
+      collectionId: collInsert.id,
       cashAccountType: selectedCashAccount?.type ?? 'caja',
     })
     setReciboOpen(true)
@@ -316,6 +337,11 @@ export default function CollectionsPage() {
               {cashAccounts.map((c) => <option key={c.id} value={c.id}>{c.name} ({formatCurrency(Number(c.balance))})</option>)}
             </select>
           </div>
+          {collectError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              {collectError}
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setModalOpen(false)} className="flex-1">Cancelar</Button>
             <Button onClick={handleCollect} loading={saving} className="flex-1">Confirmar cobro</Button>

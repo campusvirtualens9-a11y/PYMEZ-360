@@ -32,6 +32,7 @@ export default function PaymentsPage() {
     cashAccountName: string; paymentId: string; cashAccountType: string
   } | null>(null)
   const [reciboAccounting, setReciboAccounting] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [payError, setPayError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -70,52 +71,75 @@ export default function PaymentsPage() {
     setSelected(payable)
     setAmount(Number(payable.pending_amount))
     setTip('')
+    setPayError(null)
     setModalOpen(true)
   }
 
   async function handlePay() {
     if (!selected || amount <= 0 || !cashAccountId || !companyId || !userId) return
+    setPayError(null)
 
-    const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
-    if (acct && Number(acct.balance) < amount) {
-      alert(`Saldo insuficiente. Disponible: ${formatCurrency(Number(acct.balance))}`)
+    const { data: acct, error: acctErr } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
+    if (acctErr || !acct) {
+      setPayError('No se pudo verificar el saldo de la cuenta. Intentá de nuevo.')
+      return
+    }
+    if (Number(acct.balance) < amount) {
+      setPayError(`Saldo insuficiente. Disponible: ${formatCurrency(Number(acct.balance))}`)
       return
     }
 
     setSaving(true)
     const today = new Date().toISOString().split('T')[0]
 
-    const { data: payInsert } = await supabase.from('payments').insert({
+    const { data: payInsert, error: insertErr } = await supabase.from('payments').insert({
       company_id: companyId, payable_id: selected.id,
       supplier_id: selected.supplier_id, cash_account_id: cashAccountId,
       date: today,
       amount, payment_method: paymentMethod, created_by: userId,
     }).select('id').single()
 
+    if (insertErr || !payInsert) {
+      setSaving(false)
+      setPayError('No se pudo registrar el pago. Verificá tu conexión e intentá de nuevo.')
+      return
+    }
+
     const newPending = Number(selected.pending_amount) - amount
-    await supabase.from('payables').update({
+    const { error: payableErr } = await supabase.from('payables').update({
       pending_amount: Math.max(0, newPending),
       status: newPending <= 0 ? 'pagado' : 'pagado_parcial',
     }).eq('id', selected.id)
+
+    if (payableErr) {
+      setSaving(false)
+      setPayError('El pago se guardó pero no se pudo actualizar el estado. Recargá la página.')
+      return
+    }
+
+    if (newPending <= 0 && selected.purchase_id) {
+      await supabase.from('purchases').update({ status: 'pagado' }).eq('id', selected.purchase_id)
+    }
 
     const { data: sup } = await supabase.from('suppliers').select('balance').eq('id', selected.supplier_id).single()
     if (sup) {
       await supabase.from('suppliers').update({ balance: Math.max(0, Number(sup.balance) - amount) }).eq('id', selected.supplier_id)
     }
 
-    if (acct) {
-      await supabase.from('cash_accounts').update({ balance: Number(acct.balance) - amount }).eq('id', cashAccountId)
-    }
+    await supabase.from('cash_accounts').update({ balance: Number(acct.balance) - amount }).eq('id', cashAccountId)
+
     await supabase.from('cash_movements').insert({
       company_id: companyId, cash_account_id: cashAccountId,
       date: today,
       type: 'egreso', amount,
       concept: `Pago a ${selected.supplier?.name ?? 'proveedor'}`,
-      reference_type: 'payment', reference_id: payInsert?.id ?? null, created_by: userId,
+      reference_type: 'payment', reference_id: payInsert.id, created_by: userId,
     })
 
-    await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_PAYMENT' })
-    await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Pago registrado' })
+    try {
+      await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_PAYMENT' })
+      await awardXp({ profileId: userId, companyId, amount: 10, reason: 'Pago registrado' })
+    } catch { /* errors de gamificación no bloquean el flujo principal */ }
 
     setTip(getEntryExplanation('pago'))
     setModalOpen(false)
@@ -129,7 +153,7 @@ export default function PaymentsPage() {
       date: today,
       paymentMethod,
       cashAccountName: selectedCashAccount?.name ?? '—',
-      paymentId: payInsert?.id ?? '',
+      paymentId: payInsert.id,
       cashAccountType: selectedCashAccount?.type ?? 'caja',
     })
     setReciboOpen(true)
@@ -317,6 +341,11 @@ export default function PaymentsPage() {
               {cashAccounts.map((c) => <option key={c.id} value={c.id}>{c.name} ({formatCurrency(Number(c.balance))})</option>)}
             </select>
           </div>
+          {payError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              {payError}
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setModalOpen(false)} className="flex-1">Cancelar</Button>
             <Button onClick={handlePay} loading={saving} className="flex-1">Confirmar pago</Button>
