@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatCurrency, formatDate } from '@/utils/cn'
+import { CopyTokenCard } from './CopyTokenCard'
 
 const SECTOR_LABELS: Record<string, { label: string; icon: string }> = {
   comercial:    { label: 'PyME Comercial',  icon: '🏪' },
@@ -67,7 +68,6 @@ export default async function CompaniesPage() {
         </Link>
       </div>
 
-      {/* Encabezado empresa */}
       <Card>
         <CardContent>
           <div className="flex items-start gap-5">
@@ -90,40 +90,30 @@ export default async function CompaniesPage() {
         </CardContent>
       </Card>
 
-      {/* Resumen numérico */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent>
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Caja y Bancos</p>
-            <p className="text-2xl font-bold text-slate-800">{formatCurrency(totalCash)}</p>
-            <p className="text-xs text-slate-400 mt-1">{(cashAccounts ?? []).length} cuenta{(cashAccounts ?? []).length !== 1 ? 's' : ''}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Ventas</p>
-            <p className="text-2xl font-bold text-slate-800">{salesCount ?? 0}</p>
-            <p className="text-xs text-slate-400 mt-1">operaciones registradas</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Compras</p>
-            <p className="text-2xl font-bold text-slate-800">{purchasesCount ?? 0}</p>
-            <p className="text-xs text-slate-400 mt-1">operaciones registradas</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Plan de cuentas</p>
-            <p className="text-2xl font-bold text-slate-800">{accountsCount ?? 0}</p>
-            <p className="text-xs text-slate-400 mt-1">cuentas contables</p>
-          </CardContent>
-        </Card>
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Caja y Bancos</p>
+          <p className="text-2xl font-bold text-slate-800">{formatCurrency(totalCash)}</p>
+          <p className="text-xs text-slate-400 mt-1">{(cashAccounts ?? []).length} cuenta{(cashAccounts ?? []).length !== 1 ? 's' : ''}</p>
+        </CardContent></Card>
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Ventas</p>
+          <p className="text-2xl font-bold text-slate-800">{salesCount ?? 0}</p>
+          <p className="text-xs text-slate-400 mt-1">operaciones registradas</p>
+        </CardContent></Card>
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Compras</p>
+          <p className="text-2xl font-bold text-slate-800">{purchasesCount ?? 0}</p>
+          <p className="text-xs text-slate-400 mt-1">operaciones registradas</p>
+        </CardContent></Card>
+        <Card><CardContent>
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Plan de cuentas</p>
+          <p className="text-2xl font-bold text-slate-800">{accountsCount ?? 0}</p>
+          <p className="text-xs text-slate-400 mt-1">cuentas contables</p>
+        </CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Datos fiscales */}
         <Card>
           <CardContent>
             <h3 className="text-sm font-semibold text-slate-700 mb-4">Datos fiscales</h3>
@@ -151,17 +141,17 @@ export default async function CompaniesPage() {
             </div>
             <div className="mt-4 bg-purple-50 border border-purple-100 rounded-lg p-3 text-xs text-purple-800">
               <strong>Pagos mensuales:</strong> IIBB se declara y paga antes del día 25 de cada mes ante la DGR Misiones.
-              <Link href="/taxes" className="block mt-1 text-purple-600 hover:underline">→ Ver guía completa de impuestos</Link>
+              <Link href="/taxes" className="block mt-1 text-purple-600 hover:underline">Ver guía completa de impuestos</Link>
             </div>
+            <CopyTokenCard token={(company as any).sync_token ?? null} />
           </CardContent>
         </Card>
 
-        {/* Cuentas de tesorería */}
         <Card>
           <CardContent>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700">Cuentas de tesorería</h3>
-              <Link href="/treasury" className="text-xs text-blue-600 hover:underline">Ver movimientos →</Link>
+              <Link href="/treasury" className="text-xs text-blue-600 hover:underline">Ver movimientos</Link>
             </div>
             {(cashAccounts ?? []).length === 0 ? (
               <p className="text-sm text-slate-400 py-4 text-center">No hay cuentas registradas.</p>
@@ -189,13 +179,12 @@ export default async function CompaniesPage() {
         </Card>
       </div>
 
-      {/* Últimas ventas + accesos rápidos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardContent>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700">Últimas ventas</h3>
-              <Link href="/sales" className="text-xs text-blue-600 hover:underline">Ver todas →</Link>
+              <Link href="/sales" className="text-xs text-blue-600 hover:underline">Ver todas</Link>
             </div>
             {(recentSales ?? []).length === 0 ? (
               <p className="text-sm text-slate-400 py-4 text-center">Aún no hay ventas.</p>
@@ -222,11 +211,8 @@ export default async function CompaniesPage() {
                 { href: '/reports',     icon: '📈', label: 'Reportes'     },
                 { href: '/inventory',   icon: '📋', label: 'Inventario'   },
               ].map((a) => (
-                <Link
-                  key={a.href}
-                  href={a.href}
-                  className="flex items-center gap-3 p-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-colors"
-                >
+                <Link key={a.href} href={a.href}
+                  className="flex items-center gap-3 p-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-colors">
                   <span className="text-xl">{a.icon}</span>
                   <span className="text-sm font-medium text-slate-700">{a.label}</span>
                 </Link>
