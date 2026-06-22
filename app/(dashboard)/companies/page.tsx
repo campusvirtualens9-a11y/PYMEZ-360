@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatCurrency, formatDate } from '@/utils/cn'
 import { CopyTokenCard } from './CopyTokenCard'
+import { MicroModeToggle } from './MicroModeToggle'
 
 const SECTOR_LABELS: Record<string, { label: string; icon: string }> = {
   comercial:    { label: 'PyME Comercial',  icon: '🏪' },
@@ -112,6 +113,8 @@ export default async function CompaniesPage() {
           <p className="text-xs text-slate-400 mt-1">cuentas contables</p>
         </CardContent></Card>
       </div>
+
+      <MicroModeToggle initialMode={(company as any).microemprendimiento_mode ?? false} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>

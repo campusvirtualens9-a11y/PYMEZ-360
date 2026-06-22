@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import AccountingClient from './AccountingClient'
+import { MicroModeBlock } from '@/components/MicroModeBlock'
 
 export default async function AccountingPage() {
   const supabase = await createClient()
@@ -10,11 +11,15 @@ export default async function AccountingPage() {
   if (!user) redirect('/auth/login')
 
   const { data: company } = await supabase
-    .from('companies').select('id, name, sector, cuit')
+    .from('companies').select('id, name, sector, cuit, microemprendimiento_mode')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1).single()
   if (!company) redirect('/companies/new')
+
+  if (company.microemprendimiento_mode) {
+    return <MicroModeBlock module="Contabilidad" />
+  }
 
   const [
     { data: entries },
