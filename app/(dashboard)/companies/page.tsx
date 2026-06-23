@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatCurrency, formatDate } from '@/utils/cn'
+import { TributarPosLink } from '@/components/companies/TributarPosLink'
 
 const SECTOR_LABELS: Record<string, { label: string; icon: string }> = {
   comercial:    { label: 'PyME Comercial',  icon: '🏪' },
@@ -188,6 +189,34 @@ export default async function CompaniesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Vinculación con TRIBUT.AR */}
+      <Card>
+        <CardContent>
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">🏛️</span>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700">Habilitación de Punto de Venta — TRIBUT.AR</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Ingresá el código de TRIBUT.AR para autorizar la emisión de ventas en PyMEZ 360.
+              </p>
+            </div>
+          </div>
+          <TributarPosLink
+            companyId={company.id}
+            companyName={company.name}
+            initialCode={(company as any).tribut_pos_code ?? null}
+            initialPosNumber={(company as any).tribut_pos_number ?? null}
+            initialPosName={(company as any).tribut_pos_name ?? null}
+            initialLinkedAt={(company as any).tribut_pos_linked_at ?? null}
+          />
+          <div className="mt-4 bg-purple-50 border border-purple-100 rounded-lg p-3 text-xs text-purple-700">
+            <strong>¿Cómo obtener el código?</strong> Ingresá a{' '}
+            <strong>TRIBUT.AR → Puntos de venta</strong>, habilitá un punto de venta
+            y copiá el código generado (formato <span className="font-mono font-semibold">PV1-AB1234</span>).
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Últimas ventas + accesos rápidos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
