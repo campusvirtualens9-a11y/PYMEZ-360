@@ -176,6 +176,13 @@ export function TributarPosLink({
           </p>
         </div>
       )}
+
+      <p className="text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 leading-relaxed">
+        <span className="font-semibold text-slate-500">📌 Para tener en cuenta:</span> en la operatoria real,
+        si tu empresa cuenta con más de un Punto de Venta habilitado en ARCA (por ejemplo, uno para ventas
+        presenciales y otro para facturación electrónica), deberás repetir este mismo procedimiento para cada
+        uno, utilizando el código correspondiente de cada PV en TRIBUT.AR.
+      </p>
     </div>
   )
 }
