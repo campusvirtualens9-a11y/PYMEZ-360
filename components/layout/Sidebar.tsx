@@ -4,48 +4,49 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/utils/cn'
 import { LogoPyme } from '@/components/ui/LogoPyme'
+import { useMicroMode } from '@/hooks/useMicroMode'
 
-const NAV_ITEMS = [
-  { href: '/dashboard',     icon: '📊', label: 'Dashboard'       },
-  { href: '/companies',     icon: '🏢', label: 'Mi Empresa'      },
+const ALL_NAV_ITEMS = [
+  { href: '/dashboard',   icon: '📊', label: 'Dashboard'    },
+  { href: '/companies',   icon: '🏢', label: 'Mi Empresa'   },
   { divider: true },
-  { href: '/customers',     icon: '👥', label: 'Clientes'        },
-  { href: '/suppliers',     icon: '🏭', label: 'Proveedores'     },
-  { href: '/products',      icon: '📦', label: 'Productos'       },
+  { href: '/customers',   icon: '👥', label: 'Clientes'     },
+  { href: '/suppliers',   icon: '🏭', label: 'Proveedores'  },
+  { href: '/products',    icon: '📦', label: 'Productos'    },
   { divider: true },
-  { href: '/purchases',     icon: '🛒', label: 'Compras'         },
-  { href: '/sales',         icon: '💰', label: 'Ventas'          },
-  { href: '/collections',   icon: '📥', label: 'Cobros'          },
-  { href: '/payments',      icon: '📤', label: 'Pagos'           },
+  { href: '/purchases',   icon: '🛒', label: 'Compras'      },
+  { href: '/sales',       icon: '💰', label: 'Ventas'       },
+  { href: '/collections', icon: '📥', label: 'Cobros'       },
+  { href: '/payments',    icon: '📤', label: 'Pagos'        },
   { divider: true },
-  { href: '/treasury',      icon: '🏦', label: 'Tesorería'       },
-  { href: '/inventory',     icon: '📋', label: 'Inventario'      },
-  { href: '/accounting',    icon: '📒', label: 'Contabilidad'    },
-  { href: '/taxes',         icon: '🧾', label: 'Impuestos'       },
-  { href: '/reports',       icon: '📈', label: 'Reportes'        },
-  { href: '/exports',       icon: '📑', label: 'Exportar'        },
+  { href: '/treasury',    icon: '🏦', label: 'Tesorería'    },
+  { href: '/inventory',   icon: '📋', label: 'Inventario'   },
+  { href: '/accounting',  icon: '📒', label: 'Contabilidad', microLocked: true },
+  { href: '/taxes',       icon: '🧾', label: 'Impuestos',    microLocked: true },
+  { href: '/reports',     icon: '📈', label: 'Reportes'     },
+  { href: '/exports',     icon: '📑', label: 'Exportar'     },
   { divider: true },
-  { href: '/gamification',  icon: '🎮', label: 'Desafíos'        },
-  { href: '/exam',          icon: '🎓', label: 'Examen Final'    },
+  { href: '/gamification',icon: '🎮', label: 'Desafíos'     },
+  { href: '/exam',        icon: '🎓', label: 'Examen Final' },
 ]
 
 // Apps del ecosistema educativo — enlaces externos
 const ECOSYSTEM_APPS = [
   {
-    href:    'https://tributar2026nuevo.vercel.app/dashboard',
-    icon:    '🏛️',
-    label:   'Tribut.ar',
-    desc:    'Simulador ARCA/AFIP',
-    color:   'text-purple-300 hover:text-purple-100',
-    bg:      'hover:bg-purple-900/30',
+    href:  'https://tributar2026nuevo.vercel.app/dashboard',
+    icon:  '🏛️',
+    label: 'Tribut.ar',
+    desc:  'Simulador ARCA/AFIP',
+    color: 'text-purple-300 hover:text-purple-100',
+    bg:    'hover:bg-purple-900/30',
   },
   {
-    href:    'https://sueldos360.vercel.app/dashboard',
-    icon:    '👷',
-    label:   'Sueldos 360',
-    desc:    'Liquidación de haberes',
-    color:   'text-teal-300 hover:text-teal-100',
-    bg:      'hover:bg-teal-900/30',
+    href:  'https://sueldos360.vercel.app/dashboard',
+    icon:  '👷',
+    label: 'Sueldos 360',
+    desc:  'Liquidación de haberes',
+    color: 'text-teal-300 hover:text-teal-100',
+    bg:    'hover:bg-teal-900/30',
   },
 ]
 
@@ -54,6 +55,7 @@ type NavItem = {
   icon?: string
   label?: string
   divider?: boolean
+  microLocked?: boolean
 }
 
 interface SidebarProps {
@@ -63,6 +65,11 @@ interface SidebarProps {
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const { mode: isMicro, loading: modeLoading, toggle } = useMicroMode()
+
+  const navItems = isMicro
+    ? ALL_NAV_ITEMS.filter(item => !item.microLocked)
+    : ALL_NAV_ITEMS
 
   return (
     <aside
@@ -90,9 +97,31 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         </button>
       </div>
 
+      {/* ── Modo badge + toggle ────────────────────────────────────── */}
+      {!modeLoading && (
+        <div className="px-3 py-2 border-b border-slate-700/40">
+          <button
+            onClick={toggle}
+            className={cn(
+              'w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+              isMicro
+                ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+                : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-slate-200'
+            )}
+            title="Cambiar modo de empresa"
+          >
+            <span className="flex items-center gap-2">
+              <span>{isMicro ? '🛍️' : '🏭'}</span>
+              <span>{isMicro ? 'Modo Microemprendimiento' : 'Modo General (RI)'}</span>
+            </span>
+            <span className="text-[10px] opacity-60">cambiar</span>
+          </button>
+        </div>
+      )}
+
       {/* ── Navegación principal ───────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2 px-2 overscroll-contain">
-        {NAV_ITEMS.map((item: NavItem, i) => {
+        {navItems.map((item: NavItem, i) => {
           if (item.divider) {
             return <div key={i} className="my-1.5 border-t border-slate-700/40" />
           }

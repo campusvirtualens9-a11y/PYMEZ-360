@@ -39,6 +39,7 @@ export interface Company {
   sim_start_date: string
   owner_id: string
   is_demo: boolean
+  microemprendimiento_mode: boolean
   created_at: string
   updated_at: string
 }

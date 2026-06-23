@@ -1,6 +1,24 @@
 import { Card, CardContent } from '@/components/ui/Card'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { MicroModeBlock } from '@/components/MicroModeBlock'
 
-export default function TaxesPage() {
+export default async function TaxesPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('microemprendimiento_mode')
+    .eq('owner_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1).single()
+
+  if (company?.microemprendimiento_mode) {
+    return <MicroModeBlock module="Impuestos (IVA y Ganancias)" />
+  }
+
   return (
     <div className="space-y-8">
       <div>
