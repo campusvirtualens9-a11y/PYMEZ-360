@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import AccountingClient from './AccountingClient'
 import { MicroModeBlock } from '@/components/MicroModeBlock'
+import { SueldosSyncCard } from './SueldosSyncCard'
 
 export default async function AccountingPage() {
   const supabase = await createClient()
@@ -63,6 +64,12 @@ export default async function AccountingPage() {
           <Button>+ Nuevo asiento</Button>
         </Link>
       </div>
+
+      <SueldosSyncCard
+        companyId={company.id}
+        userId={user.id}
+        accounts={accounts ?? []}
+      />
 
       <AccountingClient
         entries={entries ?? []}
