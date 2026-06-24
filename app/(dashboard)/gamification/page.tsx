@@ -10,8 +10,11 @@ export default async function GamificationPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: company } = await supabase.from('companies').select('id').eq('owner_id', user.id)
+  const { data: company } = await supabase.from('companies').select('id, microemprendimiento_mode').eq('owner_id', user.id)
     .order('created_at', { ascending: false }).limit(1).single()
+
+  const isMicro = (company as any)?.microemprendimiento_mode ?? false
+  const MICRO_BLOCKED_MODULES = ['accounting', 'taxes']
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
@@ -24,8 +27,12 @@ export default async function GamificationPage() {
   ])
 
   const challengeMap = new Map((userChallenges ?? []).map((uc: any) => [uc.challenge_id, uc]))
-  const completedCount = (userChallenges ?? []).filter((uc: any) => uc.completed).length
-  const totalCount = (allChallenges ?? []).length
+
+  const visibleChallenges = (allChallenges ?? []).filter(
+    (c: any) => !isMicro || !MICRO_BLOCKED_MODULES.includes(c.module)
+  )
+  const completedCount = visibleChallenges.filter((c: any) => challengeMap.get(c.id)?.completed).length
+  const totalCount = visibleChallenges.length
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   const { needed, progress: levelProgress } = xpForNextLevel(profile?.xp ?? 0)
@@ -36,7 +43,7 @@ export default async function GamificationPage() {
     payments: '📤 Pagos', inventory: '📋 Inventario', accounting: '📒 Contabilidad', general: '🌟 General',
   }
 
-  const grouped = (allChallenges ?? []).reduce((acc: Record<string, any[]>, c: any) => {
+  const grouped = visibleChallenges.reduce((acc: Record<string, any[]>, c: any) => {
     acc[c.module] = acc[c.module] ?? []
     acc[c.module].push(c)
     return acc
@@ -116,6 +123,19 @@ export default async function GamificationPage() {
             </table>
           </CardContent>
         </Card>
+      )}
+
+      {/* Aviso modo Microemprendimiento */}
+      {isMicro && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+          <span className="text-xl flex-shrink-0">🛍️</span>
+          <p>
+            <strong>Modo Microemprendimiento activo.</strong> Los desafíos de{' '}
+            <strong>Contabilidad</strong> e <strong>Impuestos (IVA / Ganancias)</strong> están
+            desactivados porque esos módulos no aplican a Monotributistas. El progreso y el examen
+            final se calculan solo sobre los desafíos disponibles.
+          </p>
+        </div>
       )}
 
       {/* Desafíos por módulo */}

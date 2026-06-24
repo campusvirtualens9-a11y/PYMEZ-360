@@ -9,17 +9,26 @@ export default async function ExamPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: company } = await supabase.from('companies').select('id').eq('owner_id', user.id)
+  const { data: company } = await supabase.from('companies').select('id, microemprendimiento_mode').eq('owner_id', user.id)
     .order('created_at', { ascending: false }).limit(1).single()
+
+  const isMicro = (company as any)?.microemprendimiento_mode ?? false
+  const MICRO_BLOCKED_MODULES = ['accounting', 'taxes']
 
   let progress = 0
   if (company) {
-    const [{ count: total }, { count: completed }] = await Promise.all([
-      supabase.from('challenges').select('id', { count: 'exact', head: true }),
-      supabase.from('user_challenges').select('id', { count: 'exact', head: true })
+    const [{ data: allChallenges }, { data: completedRows }] = await Promise.all([
+      supabase.from('challenges').select('id, module'),
+      supabase.from('user_challenges').select('challenge_id')
         .eq('profile_id', user.id).eq('company_id', company.id).eq('completed', true),
     ])
-    progress = total ? Math.round(((completed ?? 0) / total) * 100) : 0
+    const visibleIds = new Set(
+      (allChallenges ?? [])
+        .filter((c: any) => !isMicro || !MICRO_BLOCKED_MODULES.includes(c.module))
+        .map((c: any) => c.id)
+    )
+    const completedVisible = (completedRows ?? []).filter((r: any) => visibleIds.has(r.challenge_id)).length
+    progress = visibleIds.size > 0 ? Math.round((completedVisible / visibleIds.size) * 100) : 0
   }
 
   const unlocked = progress >= 80
@@ -70,7 +79,9 @@ export default async function ExamPage() {
             <div className="text-5xl mb-3">📝</div>
             <h2 className="text-xl font-bold text-slate-800 mb-2">Evaluación Integradora</h2>
             <p className="text-slate-500 text-sm max-w-lg mx-auto">
-              El examen evalúa tu comprensión de los circuitos administrativos: compras, ventas, cobros, pagos, inventario y contabilidad integrada.
+              {isMicro
+                ? 'El examen evalúa tu comprensión de los circuitos de un microemprendimiento: compras, ventas, cobros, pagos, inventario y tesorería.'
+                : 'El examen evalúa tu comprensión de los circuitos administrativos: compras, ventas, cobros, pagos, inventario y contabilidad integrada.'}
             </p>
           </div>
 
@@ -83,17 +94,32 @@ export default async function ExamPage() {
 
           <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-xl text-sm text-blue-700">
             <p className="font-semibold mb-2">Caso práctico de ejemplo:</p>
-            <p>
-              &ldquo;La empresa compró mercaderías a crédito por $50.000, luego vendió parte de ellas de contado por $80.000 y pagó parcialmente al proveedor $20.000 en efectivo. Indicá:
-              a) qué módulos se ven afectados, b) qué impactos se producen en stock, caja, proveedores y contabilidad, y
-              c) qué asientos contables corresponde registrar.&rdquo;
-            </p>
+            {isMicro ? (
+              <p>
+                &ldquo;Tu emprendimiento compró mercaderías por $50.000 y las vendió de contado por $80.000.
+                Pagaste parcialmente al proveedor $20.000 en efectivo. Indicá:
+                a) qué impacto tiene cada operación en tu stock e inventario, b) cómo afecta el saldo de caja y proveedores,
+                y c) cómo registrás el cobro de la venta en el módulo de tesorería.&rdquo;
+              </p>
+            ) : (
+              <p>
+                &ldquo;La empresa compró mercaderías a crédito por $50.000, luego vendió parte de ellas de contado por $80.000 y pagó parcialmente al proveedor $20.000 en efectivo. Indicá:
+                a) qué módulos se ven afectados, b) qué impactos se producen en stock, caja, proveedores y contabilidad, y
+                c) qué asientos contables corresponde registrar.&rdquo;
+              </p>
+            )}
           </div>
 
           <div className="text-center">
-            <p className="text-sm text-slate-500 mb-4">El examen interactivo completo estará disponible próximamente. Por ahora podés revisar tus asientos contables y balances.</p>
+            <p className="text-sm text-slate-500 mb-4">
+              {isMicro
+                ? 'El examen interactivo completo estará disponible próximamente. Por ahora podés revisar tus ventas y tesorería.'
+                : 'El examen interactivo completo estará disponible próximamente. Por ahora podés revisar tus asientos contables y balances.'}
+            </p>
             <div className="flex gap-3 justify-center">
-              <Link href="/accounting"><Button variant="outline">Ver contabilidad</Button></Link>
+              {isMicro
+                ? <Link href="/treasury"><Button variant="outline">Ver tesorería</Button></Link>
+                : <Link href="/accounting"><Button variant="outline">Ver contabilidad</Button></Link>}
               <Link href="/gamification"><Button>Ver mis logros</Button></Link>
             </div>
           </div>
