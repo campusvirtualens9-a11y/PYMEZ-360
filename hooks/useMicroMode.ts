@@ -29,12 +29,19 @@ export function useMicroMode() {
       setLoading(false)
     }
     load()
+
+    const handler = (e: Event) => {
+      setMode((e as CustomEvent<boolean>).detail)
+    }
+    window.addEventListener('micromode-changed', handler)
+    return () => window.removeEventListener('micromode-changed', handler)
   }, [])
 
   async function toggle() {
     if (!companyId) return
     const newMode = !mode
     setMode(newMode)
+    window.dispatchEvent(new CustomEvent('micromode-changed', { detail: newMode }))
     const supabase = createClient()
     await supabase
       .from('companies')
