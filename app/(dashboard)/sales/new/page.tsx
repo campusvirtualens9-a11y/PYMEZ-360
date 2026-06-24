@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { EducationalTip } from '@/components/ui/EducationalTip'
 import { formatCurrency } from '@/utils/cn'
+import { useMicroMode } from '@/hooks/useMicroMode'
 import type { Customer, Product, CashAccount, TransactionType, PaymentMethod } from '@/types'
 import Link from 'next/link'
 
@@ -29,6 +30,7 @@ const SALE_DOC_TYPES = [
 export default function NewSalePage() {
   const router = useRouter()
   const supabase = createClient()
+  const { mode: isMicro } = useMicroMode()
 
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -43,8 +45,16 @@ export default function NewSalePage() {
   const [cashAccountId, setCashAccountId] = useState('')
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<LineItem[]>([])
-  const [ivaRate, setIvaRate] = useState(0.21)
-  const [documentType, setDocumentType] = useState('factura_b')
+  const [ivaRate, setIvaRate] = useState(isMicro ? 0 : 0.21)
+  const [documentType, setDocumentType] = useState(isMicro ? 'factura_c' : 'factura_b')
+
+  // Cuando cambia el modo micro (carga asíncrona), sincronizar valores por defecto
+  useEffect(() => {
+    if (isMicro) {
+      setIvaRate(0)
+      setDocumentType('factura_c')
+    }
+  }, [isMicro])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tip, setTip] = useState('')
@@ -265,54 +275,68 @@ export default function NewSalePage() {
             <h2 className="font-semibold text-slate-800">Tipo de comprobante</h2>
             <span className="text-xs text-slate-400">Se numerará automáticamente</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {SALE_DOC_TYPES.slice(0, 4).map(dt => (
-              <button key={dt.value} type="button" onClick={() => setDocumentType(dt.value)}
-                className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-colors ${
-                  documentType === dt.value
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}>
-                <span className={`text-xl font-bold font-mono w-10 h-10 flex items-center justify-center rounded-lg ${
-                  documentType === dt.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>{dt.letter}</span>
-                <span className={`text-xs font-semibold ${documentType === dt.value ? 'text-blue-700' : 'text-slate-700'}`}>{dt.label}</span>
-              </button>
-            ))}
-          </div>
-          {/* Notas de débito/crédito */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {SALE_DOC_TYPES.slice(4).map(dt => (
-              <button key={dt.value} type="button" onClick={() => setDocumentType(dt.value)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 text-center transition-colors ${
-                  documentType === dt.value
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}>
-                <span className={`text-xs font-bold font-mono px-2 py-1 rounded ${
-                  documentType === dt.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>{dt.letter}</span>
-                <span className={`text-xs font-medium ${documentType === dt.value ? 'text-blue-700' : 'text-slate-600'}`}>{dt.label}</span>
-              </button>
-            ))}
-          </div>
-          {/* Descripción del tipo seleccionado */}
-          {(() => {
-            const selected = SALE_DOC_TYPES.find(dt => dt.value === documentType)
-            if (!selected) return null
-            return (
-              <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 flex items-center gap-2">
-                <span className="font-bold text-slate-800">{selected.label}:</span>
-                <span>{selected.desc}</span>
-                {documentType === 'factura_a' && (
-                  <span className="ml-auto text-amber-600 font-medium">⚠ Requiere CUIT del cliente</span>
-                )}
-                {documentType === 'factura_c' && (
-                  <span className="ml-auto text-purple-600 font-medium">⚠ IVA debe ser Exento</span>
-                )}
+
+          {isMicro ? (
+            /* Modo Microemprendimiento: solo Factura C */
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <span className="text-2xl font-bold font-mono w-12 h-12 flex items-center justify-center rounded-lg bg-amber-500 text-white flex-shrink-0">C</span>
+              <div>
+                <p className="text-sm font-bold text-amber-800">Factura C — único tipo disponible</p>
+                <p className="text-xs text-amber-700">Los Monotributistas emiten exclusivamente Factura C. No discriminan IVA: el precio total es la base imponible.</p>
               </div>
-            )
-          })()}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {SALE_DOC_TYPES.slice(0, 4).map(dt => (
+                  <button key={dt.value} type="button" onClick={() => setDocumentType(dt.value)}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-colors ${
+                      documentType === dt.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`}>
+                    <span className={`text-xl font-bold font-mono w-10 h-10 flex items-center justify-center rounded-lg ${
+                      documentType === dt.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}>{dt.letter}</span>
+                    <span className={`text-xs font-semibold ${documentType === dt.value ? 'text-blue-700' : 'text-slate-700'}`}>{dt.label}</span>
+                  </button>
+                ))}
+              </div>
+              {/* Notas de débito/crédito */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {SALE_DOC_TYPES.slice(4).map(dt => (
+                  <button key={dt.value} type="button" onClick={() => setDocumentType(dt.value)}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 text-center transition-colors ${
+                      documentType === dt.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`}>
+                    <span className={`text-xs font-bold font-mono px-2 py-1 rounded ${
+                      documentType === dt.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}>{dt.letter}</span>
+                    <span className={`text-xs font-medium ${documentType === dt.value ? 'text-blue-700' : 'text-slate-600'}`}>{dt.label}</span>
+                  </button>
+                ))}
+              </div>
+              {/* Descripción del tipo seleccionado */}
+              {(() => {
+                const selected = SALE_DOC_TYPES.find(dt => dt.value === documentType)
+                if (!selected) return null
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 flex items-center gap-2">
+                    <span className="font-bold text-slate-800">{selected.label}:</span>
+                    <span>{selected.desc}</span>
+                    {documentType === 'factura_a' && (
+                      <span className="ml-auto text-amber-600 font-medium">⚠ Requiere CUIT del cliente</span>
+                    )}
+                    {documentType === 'factura_c' && (
+                      <span className="ml-auto text-purple-600 font-medium">⚠ IVA debe ser Exento</span>
+                    )}
+                  </div>
+                )
+              })()}
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -371,16 +395,23 @@ export default function NewSalePage() {
             )}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">IVA</label>
-              <div className="flex gap-2">
-                {[{ value: 0.21, label: '21%' }, { value: 0.105, label: '10.5%' }, { value: 0, label: 'Exento' }].map((opt) => (
-                  <button key={opt.value} type="button" onClick={() => setIvaRate(opt.value)}
-                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                      ivaRate === opt.value ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              {isMicro ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                  <span className="font-bold">Sin IVA (Exento)</span>
+                  <span className="text-xs">— Los Monotributistas no discriminan IVA en Factura C.</span>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  {[{ value: 0.21, label: '21%' }, { value: 0.105, label: '10.5%' }, { value: 0, label: 'Exento' }].map((opt) => (
+                    <button key={opt.value} type="button" onClick={() => setIvaRate(opt.value)}
+                      className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                        ivaRate === opt.value ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
