@@ -34,6 +34,7 @@ export default function NewSalePage() {
 
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [posLinked, setPosLinked] = useState<boolean | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([])
@@ -66,11 +67,12 @@ export default function NewSalePage() {
     setUserId(user.id)
 
     const { data: company } = await supabase
-      .from('companies').select('id, iibb_rate').eq('owner_id', user.id)
+      .from('companies').select('id, iibb_rate, tribut_pos_linked_at').eq('owner_id', user.id)
       .order('created_at', { ascending: false }).limit(1).single()
     if (!company) return
     setCompanyId(company.id)
     setCompanyIibbRate(Number(company.iibb_rate ?? 0))
+    setPosLinked(!!(company as any).tribut_pos_linked_at)
 
     const [{ data: cust }, { data: prod }, { data: cash }] = await Promise.all([
       supabase.from('customers').select('*').eq('company_id', company.id).order('name'),
@@ -257,6 +259,29 @@ export default function NewSalePage() {
 
     setTimeout(() => router.push(`/sales/${sale.id}`), 2500)
   }
+
+  if (posLinked === false) return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/sales" className="text-slate-400 hover:text-slate-600">← Volver</Link>
+        <h1 className="text-2xl font-bold text-slate-800">Nueva venta</h1>
+      </div>
+      <div className="flex flex-col items-center justify-center py-20 gap-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center text-3xl">🔗</div>
+        <div className="max-w-md">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Punto de venta no sincronizado</h2>
+          <p className="text-slate-500 text-sm">
+            Para registrar ventas necesitás vincular tu empresa a un Punto de Venta habilitado en{' '}
+            <strong>TRIBUT.AR</strong>. Obtené el código en <strong>TRIBUT.AR → Puntos de venta</strong>{' '}
+            e ingresalo en la configuración de tu empresa.
+          </p>
+        </div>
+        <Link href="/companies" className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+          Ir a Mi Empresa →
+        </Link>
+      </div>
+    </div>
+  )
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
