@@ -12,7 +12,7 @@ import type { Product } from '@/types'
 
 const emptyForm = {
   code: '', name: '', description: '', category: '', unit: 'unidad',
-  cost_price: 0, sale_price: 0, stock_current: 0, stock_min: 0,
+  cost_price: 0, sale_price: 0, stock_current: 0, stock_min: 0, is_service: false,
 }
 
 export default function ProductsPage() {
@@ -60,6 +60,7 @@ export default function ProductsPage() {
       code: p.code, name: p.name, description: p.description ?? '', category: p.category ?? '',
       unit: p.unit, cost_price: Number(p.cost_price), sale_price: Number(p.sale_price),
       stock_current: Number(p.stock_current), stock_min: Number(p.stock_min),
+      is_service: p.is_service ?? false,
     })
     setError('')
     setModalOpen(true)
@@ -75,7 +76,9 @@ export default function ProductsPage() {
     const payload = {
       code: form.code, name: form.name, description: form.description, category: form.category,
       unit: form.unit, cost_price: form.cost_price, sale_price: form.sale_price,
-      stock_current: form.stock_current, stock_min: form.stock_min,
+      is_service: form.is_service,
+      stock_current: form.is_service ? 0 : form.stock_current,
+      stock_min:     form.is_service ? 0 : form.stock_min,
     }
 
     if (editing) {
@@ -102,7 +105,9 @@ export default function ProductsPage() {
   const f = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const val = ['cost_price', 'sale_price', 'stock_current', 'stock_min'].includes(field)
       ? Number(e.target.value)
-      : e.target.value
+      : field === 'is_service'
+        ? (e.target as HTMLInputElement).checked
+        : e.target.value
     setForm((prev) => ({ ...prev, [field]: val }))
   }
 
@@ -121,20 +126,20 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Productos</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Catálogo de productos e insumos de la empresa.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Productos y Servicios</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Catálogo de productos, insumos y servicios de la empresa.</p>
         </div>
-        <Button onClick={openNew}>+ Nuevo producto</Button>
+        <Button onClick={openNew}>+ Nuevo ítem</Button>
       </div>
 
       <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg text-sm text-blue-700">
-        💡 <strong>¿Para qué sirve el catálogo?</strong> Acá vas a registrar todos los productos que comprás y vendés. Cada producto tiene un precio de costo, un precio de venta y un stock que se actualiza automáticamente con cada operación.
+        💡 <strong>¿Para qué sirve el catálogo?</strong> Registrá los productos que comprás y vendés (con control de stock) y los servicios que prestás (sin stock, con disponibilidad). Cada ítem tiene precio de costo y venta que se usa en ventas y compras.
       </div>
 
       <div className="flex gap-3">
         <input type="text" placeholder="Buscar por nombre o código..." value={search} onChange={(e) => setSearch(e.target.value)}
           className="flex-1 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900" />
-        <Badge variant="info">{filtered.length} producto{filtered.length !== 1 ? 's' : ''}</Badge>
+        <Badge variant="info">{filtered.length} ítem{filtered.length !== 1 ? 's' : ''}</Badge>
       </div>
 
       <Card>
@@ -144,8 +149,8 @@ export default function ProductsPage() {
           ) : filtered.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-2">📦</div>
-              <p className="text-slate-500 text-sm">No hay productos en el catálogo.</p>
-              <Button onClick={openNew} size="sm" className="mt-4">Agregar primer producto</Button>
+              <p className="text-slate-500 text-sm">No hay productos ni servicios en el catálogo.</p>
+              <Button onClick={openNew} size="sm" className="mt-4">Agregar primer ítem</Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -158,7 +163,7 @@ export default function ProductsPage() {
                     <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Costo</th>
                     <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Venta</th>
                     <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Margen</th>
-                    <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Stock</th>
+                    <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Stock / Dispon.</th>
                     <th className="text-right px-5 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide">Acciones</th>
                   </tr>
                 </thead>
@@ -169,7 +174,10 @@ export default function ProductsPage() {
                     return (
                       <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-3 font-mono text-xs text-slate-500">{p.code}</td>
-                        <td className="px-5 py-3 font-medium text-slate-800">{p.name}</td>
+                        <td className="px-5 py-3 font-medium text-slate-800">
+                          {p.name}
+                          {p.is_service && <span className="ml-2 text-[10px] font-semibold bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">SERVICIO</span>}
+                        </td>
                         <td className="px-5 py-3 text-slate-600">{p.category ?? '—'}</td>
                         <td className="px-5 py-3 text-right text-slate-700">{formatCurrency(Number(p.cost_price))}</td>
                         <td className="px-5 py-3 text-right font-medium text-slate-800">{formatCurrency(Number(p.sale_price))}</td>
@@ -177,10 +185,16 @@ export default function ProductsPage() {
                           {mg ? <Badge variant={Number(mg) >= 20 ? 'success' : 'warning'}>{mg}%</Badge> : '—'}
                         </td>
                         <td className="px-5 py-3 text-right">
-                          <span className={`font-bold ${lowStock ? 'text-red-600' : 'text-slate-800'}`}>
-                            {p.stock_current} {p.unit}
-                          </span>
-                          {lowStock && <span className="ml-1 text-xs text-red-400">⚠️</span>}
+                          {p.is_service ? (
+                            <span className="text-xs text-violet-600 font-medium">Sin stock</span>
+                          ) : (
+                            <>
+                              <span className={`font-bold ${lowStock ? 'text-red-600' : 'text-slate-800'}`}>
+                                {p.stock_current} {p.unit}
+                              </span>
+                              {lowStock && <span className="ml-1 text-xs text-red-400">⚠️</span>}
+                            </>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-right">
                           <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>✏️</Button>
@@ -196,9 +210,21 @@ export default function ProductsPage() {
       </Card>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar producto' : 'Nuevo producto'} size="lg">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `Editar ${form.is_service ? 'servicio' : 'producto'}` : 'Nuevo ítem'} size="lg">
         <div className="p-5 space-y-4">
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+
+          {/* Toggle producto / servicio */}
+          <div className="flex gap-2">
+            {[{ value: false, label: '📦 Producto', desc: 'Tiene stock físico' }, { value: true, label: '🛠️ Servicio', desc: 'Sin stock, con disponibilidad' }].map(opt => (
+              <button key={String(opt.value)} type="button"
+                onClick={() => setForm(prev => ({ ...prev, is_service: opt.value, stock_current: 0, stock_min: 0 }))}
+                className={`flex-1 flex flex-col items-center py-2.5 px-3 rounded-xl border-2 text-sm transition-colors ${form.is_service === opt.value ? 'border-violet-500 bg-violet-50 text-violet-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                <span className="font-semibold">{opt.label}</span>
+                <span className="text-[10px] text-slate-500 mt-0.5">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -243,18 +269,24 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Stock actual</label>
-              <input type="number" value={form.stock_current} onChange={f('stock_current')} min="0" step="0.001"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
+          {form.is_service ? (
+            <div className="bg-violet-50 border border-violet-200 rounded-lg px-4 py-3 text-sm text-violet-700">
+              Los servicios no tienen stock físico. La disponibilidad se gestiona según la capacidad operativa de la empresa.
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Stock mínimo (alerta)</label>
-              <input type="number" value={form.stock_min} onChange={f('stock_min')} min="0" step="0.001"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Stock actual</label>
+                <input type="number" value={form.stock_current} onChange={f('stock_current')} min="0" step="0.001"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Stock mínimo (alerta)</label>
+                <input type="number" value={form.stock_min} onChange={f('stock_min')} min="0" step="0.001"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
+              </div>
             </div>
-          </div>
+          )}
 
           {form.cost_price > 0 && form.sale_price > 0 && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">

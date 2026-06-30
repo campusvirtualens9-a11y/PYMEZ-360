@@ -149,10 +149,10 @@ export default function NewSalePage() {
       .not('doc_number', 'is', null).order('doc_number', { ascending: false }).limit(1).maybeSingle()
     const nextDocNumber = (lastSale?.doc_number ?? 0) + 1
 
-    // Verificar stock antes de continuar
+    // Verificar stock (solo para productos, no servicios)
     for (const l of lines) {
       const prod = products.find((p) => p.id === l.productId)
-      if (prod && Number(prod.stock_current) < l.quantity) {
+      if (prod && !prod.is_service && Number(prod.stock_current) < l.quantity) {
         setError(`Stock insuficiente para "${prod.name}". Disponible: ${prod.stock_current}`)
         setSaving(false)
         return
@@ -194,8 +194,10 @@ export default function NewSalePage() {
       }))
     )
 
-    // 3. Reducir stock de cada producto
+    // 3. Reducir stock (solo productos, no servicios)
     for (const l of lines) {
+      const prod = products.find(p => p.id === l.productId)
+      if (prod?.is_service) continue
       await updateStock({
         companyId,
         productId: l.productId,
@@ -471,7 +473,7 @@ export default function NewSalePage() {
       <Card>
         <CardContent>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800">Productos vendidos</h2>
+            <h2 className="font-semibold text-slate-800">Productos / Servicios</h2>
             <Button variant="outline" size="sm" onClick={addLine}>+ Agregar producto</Button>
           </div>
 
@@ -483,15 +485,21 @@ export default function NewSalePage() {
             <div className="space-y-2">
               {lines.map((l, idx) => {
                 const prod = products.find((p) => p.id === l.productId)
-                const lowStock = prod && Number(prod.stock_current) < l.quantity
+                const isService = prod?.is_service ?? false
+                const lowStock = !isService && prod && Number(prod.stock_current) < l.quantity
                 return (
                   <div key={idx} className={`flex items-center gap-3 p-3 rounded-xl ${lowStock ? 'bg-red-50 border border-red-200' : 'bg-slate-50'}`}>
                     <div className="flex-1 min-w-0">
                       <select value={l.productId} onChange={(e) => updateLine(idx, 'productId', e.target.value)}
                         className="w-full px-2 py-1.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm bg-white">
-                        {products.map((p) => <option key={p.id} value={p.id}>{p.name} (stock: {p.stock_current} {p.unit})</option>)}
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.is_service ? `🛠️ ${p.name}` : `${p.name} (stock: ${p.stock_current} ${p.unit})`}
+                          </option>
+                        ))}
                       </select>
                       {lowStock && <p className="text-xs text-red-500 mt-1">⚠️ Stock insuficiente</p>}
+                      {isService && <p className="text-xs text-violet-600 mt-1">Servicio — sin descuento de stock</p>}
                     </div>
                     <div className="w-20">
                       <input type="number" value={l.quantity} min="0.001" step="0.001"

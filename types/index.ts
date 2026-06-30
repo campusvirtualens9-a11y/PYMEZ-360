@@ -82,6 +82,7 @@ export interface Product {
   sale_price: number
   stock_current: number
   stock_min: number
+  is_service: boolean
   warehouse_id?: string
   created_at: string
   updated_at: string
