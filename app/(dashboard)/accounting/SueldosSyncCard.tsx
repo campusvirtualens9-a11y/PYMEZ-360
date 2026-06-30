@@ -69,57 +69,81 @@ export function SueldosSyncCard({ companyId, userId, accounts }: Props) {
       setLoading(false) }
   }
 
+  async function getOrCreate(supabase: ReturnType<typeof createClient>, found: Account | null, payload: { company_id: string; code: string; name: string; type: string; description: string }): Promise<Account> {
+    if (found) return found
+    const { data, error } = await (supabase as any)
+      .from('accounts')
+      .insert(payload)
+      .select('id, code, name, type')
+      .single()
+    if (error) throw new Error(`No se pudo crear la cuenta "${payload.name}": ${error.message}`)
+    return data as Account
+  }
+
   async function createEntries() {
     if (!data) return
     setSaving(true); setError(null)
     const supabase = createClient()
 
     try {
-      // Buscar o crear cuentas necesarias
-      const cuentaSueldos = findAccount(accounts, 'egreso', ['sueldo', 'remun', 'habere'])
-      const cuentaCargas  = findAccount(accounts, 'egreso', ['carga', 'patronal', 'social'])
-      const cuentaAPagar  = findAccount(accounts, 'pasivo', ['sueldo a pagar', 'haberes a pagar', 'sueldos a pagar'])
-      const cuentaRetenc  = findAccount(accounts, 'pasivo', ['retenc', 'aporte', 'descuento'])
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: company } = await (supabase as any)
+        .from('companies').select('id').eq('owner_id', user!.id)
+        .order('created_at', { ascending: false }).limit(1).single()
+      const cId = company?.id ?? companyId
 
-      if (!cuentaSueldos || !cuentaAPagar) {
-        setError('No se encontraron cuentas de Sueldos y Jornales o Sueldos a Pagar en el plan de cuentas. Creá estas cuentas primero en Contabilidad.')
-        setSaving(false); return
-      }
+      // Buscar cuentas; crearlas automáticamente si no existen
+      const cuentaSueldos = await getOrCreate(supabase,
+        findAccount(accounts, 'egreso', ['sueldo', 'remun', 'habere']),
+        { company_id: cId, code: '5.1.01', name: 'Sueldos y Jornales', type: 'egreso', description: 'Remuneraciones brutas del personal' })
+
+      const cuentaCargas = await getOrCreate(supabase,
+        findAccount(accounts, 'egreso', ['carga', 'patronal', 'social']),
+        { company_id: cId, code: '5.1.02', name: 'Cargas Sociales Patronales', type: 'egreso', description: 'Contribuciones patronales a organismos de seguridad social' })
+
+      const cuentaAPagar = await getOrCreate(supabase,
+        findAccount(accounts, 'pasivo', ['sueldo a pagar', 'haberes a pagar', 'sueldos a pagar']),
+        { company_id: cId, code: '2.1.01', name: 'Sueldos a Pagar', type: 'pasivo', description: 'Remuneraciones netas pendientes de pago' })
+
+      const cuentaRetenc = await getOrCreate(supabase,
+        findAccount(accounts, 'pasivo', ['retenc', 'aporte', 'descuento']),
+        { company_id: cId, code: '2.1.02', name: 'Retenciones Previsionales a Pagar', type: 'pasivo', description: 'Aportes retenidos al trabajador pendientes de depósito' })
+
+      const cuentaCargasPasivo = await getOrCreate(supabase,
+        findAccount(accounts, 'pasivo', ['patronal', 'contribuc', 'carga social']),
+        { company_id: cId, code: '2.1.03', name: 'Contribuciones Patronales a Pagar', type: 'pasivo', description: 'Contribuciones patronales pendientes de depósito' })
 
       const { totals, period: p, company_name, employee_count } = data
       const desc1 = `Liquidación sueldos ${p} — ${company_name} (${employee_count} empleados)`
       const desc2 = `Cargas sociales patronales ${p} — ${company_name}`
 
       // Asiento 1: Devengamiento sueldos
-      const { data: entry1, error: e1 } = await supabase
+      const { data: entry1, error: e1 } = await (supabase as any)
         .from('journal_entries')
         .insert({ company_id: companyId, date: `${p}-25`, description: desc1, entry_type: 'automatico', reference_type: 'sueldos360', created_by: userId })
         .select('id').single()
       if (e1) throw new Error(e1.message)
 
-      const lines1 = [
+      const lines1: any[] = [
         { journal_entry_id: entry1.id, account_id: cuentaSueldos.id, debit: totals.total_bruto, credit: 0, description: 'Sueldos brutos' },
         { journal_entry_id: entry1.id, account_id: cuentaAPagar.id,  debit: 0, credit: totals.total_neto, description: 'Neto a pagar' },
       ]
-      if (cuentaRetenc && totals.total_aportes_trabajador > 0) {
+      if (totals.total_aportes_trabajador > 0) {
         lines1.push({ journal_entry_id: entry1.id, account_id: cuentaRetenc.id, debit: 0, credit: totals.total_aportes_trabajador, description: 'Retenciones previsionales empleado' })
       }
-      await supabase.from('journal_entry_lines').insert(lines1)
+      await (supabase as any).from('journal_entry_lines').insert(lines1)
 
-      // Asiento 2: Cargas patronales (solo si hay cuenta y monto)
-      if (cuentaCargas && totals.total_contribuciones_patronales > 0) {
-        const cuentaCargasAPagar = findAccount(accounts, 'pasivo', ['patronal', 'contribuc', 'carga social'])
-          ?? cuentaAPagar
-
-        const { data: entry2, error: e2 } = await supabase
+      // Asiento 2: Cargas patronales
+      if (totals.total_contribuciones_patronales > 0) {
+        const { data: entry2, error: e2 } = await (supabase as any)
           .from('journal_entries')
           .insert({ company_id: companyId, date: `${p}-25`, description: desc2, entry_type: 'automatico', reference_type: 'sueldos360', created_by: userId })
           .select('id').single()
         if (e2) throw new Error(e2.message)
 
-        await supabase.from('journal_entry_lines').insert([
+        await (supabase as any).from('journal_entry_lines').insert([
           { journal_entry_id: entry2.id, account_id: cuentaCargas.id,       debit: totals.total_contribuciones_patronales, credit: 0, description: 'Cargas patronales' },
-          { journal_entry_id: entry2.id, account_id: cuentaCargasAPagar.id, debit: 0, credit: totals.total_contribuciones_patronales, description: 'Contribuciones patronales a pagar' },
+          { journal_entry_id: entry2.id, account_id: cuentaCargasPasivo.id, debit: 0, credit: totals.total_contribuciones_patronales, description: 'Contribuciones patronales a pagar' },
         ])
       }
 
