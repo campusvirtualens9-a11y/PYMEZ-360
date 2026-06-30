@@ -69,11 +69,11 @@ export function SueldosSyncCard({ companyId, userId, accounts }: Props) {
       setLoading(false) }
   }
 
-  async function getOrCreate(supabase: ReturnType<typeof createClient>, found: Account | null, payload: { company_id: string; code: string; name: string; type: string; description: string }): Promise<Account> {
+  async function getOrCreate(supabase: ReturnType<typeof createClient>, found: Account | null, payload: { company_id: string; code: string; name: string; type: string }): Promise<Account> {
     if (found) return found
     const { data, error } = await (supabase as any)
-      .from('accounts')
-      .insert(payload)
+      .from('chart_of_accounts')
+      .insert({ ...payload, is_active: true })
       .select('id, code, name, type')
       .single()
     if (error) throw new Error(`No se pudo crear la cuenta "${payload.name}": ${error.message}`)
@@ -95,23 +95,23 @@ export function SueldosSyncCard({ companyId, userId, accounts }: Props) {
       // Buscar cuentas; crearlas automáticamente si no existen
       const cuentaSueldos = await getOrCreate(supabase,
         findAccount(accounts, 'egreso', ['sueldo', 'remun', 'habere']),
-        { company_id: cId, code: '5.1.01', name: 'Sueldos y Jornales', type: 'egreso', description: 'Remuneraciones brutas del personal' })
+        { company_id: cId, code: '5.1.01', name: 'Sueldos y Jornales', type: 'egreso' })
 
       const cuentaCargas = await getOrCreate(supabase,
         findAccount(accounts, 'egreso', ['carga', 'patronal', 'social']),
-        { company_id: cId, code: '5.1.02', name: 'Cargas Sociales Patronales', type: 'egreso', description: 'Contribuciones patronales a organismos de seguridad social' })
+        { company_id: cId, code: '5.1.02', name: 'Cargas Sociales Patronales', type: 'egreso' })
 
       const cuentaAPagar = await getOrCreate(supabase,
         findAccount(accounts, 'pasivo', ['sueldo a pagar', 'haberes a pagar', 'sueldos a pagar']),
-        { company_id: cId, code: '2.1.01', name: 'Sueldos a Pagar', type: 'pasivo', description: 'Remuneraciones netas pendientes de pago' })
+        { company_id: cId, code: '2.1.01', name: 'Sueldos a Pagar', type: 'pasivo' })
 
       const cuentaRetenc = await getOrCreate(supabase,
         findAccount(accounts, 'pasivo', ['retenc', 'aporte', 'descuento']),
-        { company_id: cId, code: '2.1.02', name: 'Retenciones Previsionales a Pagar', type: 'pasivo', description: 'Aportes retenidos al trabajador pendientes de depósito' })
+        { company_id: cId, code: '2.1.02', name: 'Retenciones Previsionales a Pagar', type: 'pasivo' })
 
       const cuentaCargasPasivo = await getOrCreate(supabase,
         findAccount(accounts, 'pasivo', ['patronal', 'contribuc', 'carga social']),
-        { company_id: cId, code: '2.1.03', name: 'Contribuciones Patronales a Pagar', type: 'pasivo', description: 'Contribuciones patronales pendientes de depósito' })
+        { company_id: cId, code: '2.1.03', name: 'Contribuciones Patronales a Pagar', type: 'pasivo' })
 
       const { totals, period: p, company_name, employee_count } = data
       const desc1 = `Liquidación sueldos ${p} — ${company_name} (${employee_count} empleados)`
