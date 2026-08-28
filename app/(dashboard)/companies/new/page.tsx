@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { setupCompany } from '@/lib/companies/setup'
 import type { BusinessSector } from '@/types'
+import { IIBB_ACTIVITIES, ACTIVITY_CATEGORIES } from '@/lib/constants/iibb-misiones'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 
@@ -28,7 +29,7 @@ export default function NewCompanyPage() {
   const [initialCash, setInitialCash] = useState(50000)
   const [initialBank, setInitialBank] = useState(100000)
   const [iibbRate, setIibbRate] = useState(0.03)
-  const [iibbIdx,  setIibbIdx]  = useState(0)
+  const [actividad, setActividad] = useState('521000')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -218,36 +219,46 @@ export default function NewCompanyPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Alícuota Ingresos Brutos (IIBB)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Actividad e Ingresos Brutos (IIBB)</label>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-xs text-blue-800 space-y-1">
                 <p><strong>Pago mensual</strong> — Se presenta una Declaración Jurada (DDJJ) ante la Dirección General de Rentas (DGR) de cada provincia.</p>
                 <p>La base imponible son los <strong>ingresos netos sin IVA</strong> del mes. Vence generalmente el <strong>25 de cada mes</strong>.</p>
                 <p className="text-blue-600">→ Misiones: se paga vía DGR Misiones (dgr.misiones.gov.ar) o bancos habilitados.</p>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 0.03,  label: '3%',      desc: 'Misiones (DGR)' },
-                  { value: 0.03,  label: '3%',      desc: 'Bs. As. / CABA' },
-                  { value: 0.035, label: '3.5%',    desc: 'Córdoba' },
-                  { value: 0.02,  label: '2%',      desc: 'Reducida' },
-                  { value: 0.015, label: '1.5%',    desc: 'Actividad reducida' },
-                  { value: 0,     label: 'Exento',  desc: 'Sin IIBB' },
-                ].map((opt, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => { setIibbRate(opt.value); setIibbIdx(idx) }}
-                    className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors text-center ${
-                      iibbIdx === idx
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div>{opt.label}</div>
-                    <div className="text-xs font-normal opacity-70">{opt.desc}</div>
-                  </button>
+              <select
+                value={actividad}
+                onChange={(e) => {
+                  const act = IIBB_ACTIVITIES.find(a => a.code === e.target.value)
+                  setActividad(e.target.value)
+                  setIibbRate(act ? act.rate : 0)
+                }}
+                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 bg-white text-sm"
+              >
+                <option value="">— Exento / sin actividad gravada —</option>
+                {ACTIVITY_CATEGORIES.map(cat => (
+                  <optgroup key={cat.key} label={cat.label}>
+                    {IIBB_ACTIVITIES.filter(a => a.category === cat.key).map(a => (
+                      <option key={a.code} value={a.code}>
+                        {a.code} — {a.name} ({(a.rate * 100).toFixed(1)}%)
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
-              </div>
+              </select>
+              <p className="text-xs text-slate-500 mt-2">
+                {actividad ? (
+                  <>
+                    Alícuota <strong className="text-blue-700">{(iibbRate * 100).toFixed(1)}%</strong> —{' '}
+                    {IIBB_ACTIVITIES.find(a => a.code === actividad)?.description}
+                  </>
+                ) : (
+                  'Sin actividad gravada no se devenga IIBB en las ventas.'
+                )}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Es el mismo listado que usa TRIBUT.AR para la DDJJ ante ATM Misiones, así la alícuota con la que se
+                devenga el impuesto en cada venta coincide con la que después liquidás.
+              </p>
             </div>
 
             {/* Resumen */}

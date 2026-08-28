@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { formatCurrency, formatDate } from '@/utils/cn'
 import { CopyTokenCard } from './CopyTokenCard'
 import { MicroModeToggle } from './MicroModeToggle'
+import { IibbActividadCard } from './IibbActividadCard'
 import { TributarPosLink } from '@/components/companies/TributarPosLink'
 
 const SECTOR_LABELS: Record<string, { label: string; icon: string }> = {
@@ -114,6 +115,8 @@ export default async function CompaniesPage() {
           <p className="text-xs text-slate-400 mt-1">cuentas contables</p>
         </CardContent></Card>
       </div>
+
+      <IibbActividadCard companyId={company.id} currentRate={Number(company.iibb_rate)} />
 
       <MicroModeToggle initialMode={(company as any).microemprendimiento_mode ?? false} />
 
