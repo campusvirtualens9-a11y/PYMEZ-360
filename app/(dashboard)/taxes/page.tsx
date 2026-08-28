@@ -2,6 +2,12 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { MicroModeBlock } from '@/components/MicroModeBlock'
+import { IibbPanel } from './IibbPanel'
+
+const MESES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+]
 
 export default async function TaxesPage() {
   const supabase = await createClient()
@@ -10,14 +16,54 @@ export default async function TaxesPage() {
 
   const { data: company } = await supabase
     .from('companies')
-    .select('microemprendimiento_mode')
+    .select('id, microemprendimiento_mode')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1).single()
+  if (!company) redirect('/companies/new')
 
-  if (company?.microemprendimiento_mode) {
+  if (company.microemprendimiento_mode) {
     return <MicroModeBlock module="Impuestos (IVA y Ganancias)" />
   }
+
+  // ── Situación real de IIBB de la empresa ──────────────────────────────────
+  // El IIBB se devenga con cada venta acreditando 2.1.8; los pagos la debitan.
+  // El saldo acreedor de esa cuenta es, entonces, la deuda todavía sin pagar.
+  const [{ data: iibbAccount }, { data: entries }, { data: cashAccounts }] = await Promise.all([
+    supabase
+      .from('chart_of_accounts')
+      .select('id')
+      .eq('company_id', company.id)
+      .eq('code', '2.1.8')
+      .maybeSingle(),
+    supabase
+      .from('journal_entries')
+      .select('date, lines:journal_entry_lines(account_id, debit, credit)')
+      .eq('company_id', company.id),
+    supabase
+      .from('cash_accounts')
+      .select('id, name, type, balance')
+      .eq('company_id', company.id)
+      .order('name'),
+  ])
+
+  const hoy         = new Date()
+  const periodo     = `${MESES[hoy.getMonth()]} ${hoy.getFullYear()}`
+  const prefijoMes  = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+
+  let saldoPendiente = 0
+  let devengadoMes   = 0
+
+  if (iibbAccount?.id) {
+    for (const entry of (entries ?? []) as { date: string; lines: { account_id: string; debit: number; credit: number }[] }[]) {
+      for (const line of entry.lines ?? []) {
+        if (line.account_id !== iibbAccount.id) continue
+        saldoPendiente += Number(line.credit) - Number(line.debit)
+        if (entry.date?.startsWith(prefijoMes)) devengadoMes += Number(line.credit)
+      }
+    }
+  }
+  saldoPendiente = Math.round(saldoPendiente * 100) / 100
 
   return (
     <div className="space-y-8">
@@ -38,6 +84,16 @@ export default async function TaxesPage() {
             <p className="text-sm text-slate-500">Impuesto provincial · Dirección General de Rentas (DGR) Misiones</p>
           </div>
         </div>
+
+        <IibbPanel
+          companyId={company.id}
+          userId={user.id}
+          iibbAccountId={iibbAccount?.id ?? null}
+          saldoPendiente={saldoPendiente}
+          devengadoMes={devengadoMes}
+          periodo={periodo}
+          cashAccounts={(cashAccounts ?? []) as { id: string; name: string; type: 'caja' | 'banco'; balance: number }[]}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
