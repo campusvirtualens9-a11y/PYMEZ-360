@@ -51,6 +51,13 @@ export default async function AccountingPage() {
       .order('date', { ascending: true }),
   ])
 
+  // Necesarias para registrar el pago del IVA liquidado desde el Libro IVA.
+  const { data: cashAccounts } = await supabase
+    .from('cash_accounts')
+    .select('id, name, type, balance')
+    .eq('company_id', company.id)
+    .order('name')
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start sm:items-center justify-between gap-y-2">
@@ -80,6 +87,7 @@ export default async function AccountingPage() {
         userId={user.id}
         companyName={company.name}
         companyCuit={company.cuit}
+        cashAccounts={(cashAccounts ?? []) as { id: string; name: string; type: 'caja' | 'banco'; balance: number }[]}
       />
     </div>
   )

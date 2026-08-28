@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { formatCurrency, formatDate } from '@/utils/cn'
+import { IvaLiquidacionPanel } from './IvaLiquidacionPanel'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -36,10 +37,14 @@ interface PurchaseRow {
   id: string; date: string; total: number; transaction_type: string
   supplier: RelatedEntity[] | RelatedEntity | null
 }
+interface CashAccount {
+  id: string; name: string; type: 'caja' | 'banco'; balance: number
+}
 interface Props {
   entries: JournalEntry[]; accounts: Account[]
   sales: SaleRow[]; purchases: PurchaseRow[]
   companyId: string; userId: string; companyName: string; companyCuit: string
+  cashAccounts: CashAccount[]
 }
 
 // ─── Computations ──────────────────────────────────────────────────────────
@@ -152,7 +157,7 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 // ─── Main component ────────────────────────────────────────────────────────
 
-export default function AccountingClient({ entries, accounts, sales, purchases, companyId, userId, companyName, companyCuit }: Props) {
+export default function AccountingClient({ entries, accounts, sales, purchases, companyId, userId, companyName, companyCuit, cashAccounts }: Props) {
   const supabase = createClient()
   const router   = useRouter()
 
@@ -706,6 +711,14 @@ export default function AccountingClient({ entries, accounts, sales, purchases, 
               </CardContent>
             </Card>
           </div>
+
+          <IvaLiquidacionPanel
+            entries={entries}
+            accounts={accounts}
+            companyId={companyId}
+            userId={userId}
+            cashAccounts={cashAccounts}
+          />
 
           <div className="bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r-lg text-xs text-amber-700">
             💡 <strong>IVA estimado:</strong> Calculado asumiendo precios con IVA 21% incluido (neto = total ÷ 1,21). Solo aplica a empresas <strong>Responsables Inscriptos</strong>. Monotributistas no declaran IVA.

@@ -66,6 +66,7 @@ const BASE_ACCOUNTS = [
   { code: '2.1.14', name: 'Deudas Financieras a Corto Plazo',        type: 'pasivo'     },
   { code: '2.1.15', name: 'Cheques Diferidos a Pagar',               type: 'pasivo'     },
   { code: '2.1.16', name: 'Socios / Accionistas Ctas. Corrientes',   type: 'pasivo'     },
+  { code: '2.1.17', name: 'IVA a Pagar',                             type: 'pasivo'     },
   // ── PASIVO NO CORRIENTE ───────────────────────────────────────────────
   { code: '2.2.1',  name: 'Préstamos Bancarios No Corrientes',       type: 'pasivo'     },
   { code: '2.2.2',  name: 'Hipotecas a Pagar',                       type: 'pasivo'     },
