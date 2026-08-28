@@ -36,6 +36,11 @@ function findAccount(accounts: Account[], type: string, keywords: string[]) {
   ) ?? null
 }
 
+/** Búsqueda exacta por código del plan de cuentas. */
+function findByCode(accounts: Account[], code: string) {
+  return accounts.find(a => a.code === code) ?? null
+}
+
 interface Props {
   companyId: string
   userId: string
@@ -86,32 +91,30 @@ export function SueldosSyncCard({ companyId, userId, accounts }: Props) {
     const supabase = createClient()
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: company } = await (supabase as any)
-        .from('companies').select('id').eq('owner_id', user!.id)
-        .order('created_at', { ascending: false }).limit(1).single()
-      const cId = company?.id ?? companyId
-
-      // Buscar cuentas; crearlas automáticamente si no existen
+      // Las cuentas se ubican por código del plan base. Buscarlas por nombre
+      // fallaba: "Sueldos y Jornales a Pagar" no contiene "sueldos a pagar",
+      // así que se creaban cuentas paralelas (2.1.01, 2.1.02, 2.1.03) y las del
+      // plan quedaban sin usar. Para los pasivos el código es la única fuente,
+      // sin respaldo por nombre, para no reengancharse a esas duplicadas.
       const cuentaSueldos = await getOrCreate(supabase,
-        findAccount(accounts, 'egreso', ['sueldo', 'remun', 'habere']),
-        { company_id: cId, code: '5.1.01', name: 'Sueldos y Jornales', type: 'egreso' })
+        findByCode(accounts, '5.2.1') ?? findAccount(accounts, 'egreso', ['sueldo', 'remun', 'habere']),
+        { company_id: companyId, code: '5.2.1', name: 'Sueldos y Jornales (Comercialización)', type: 'egreso' })
 
       const cuentaCargas = await getOrCreate(supabase,
-        findAccount(accounts, 'egreso', ['carga', 'patronal', 'social']),
-        { company_id: cId, code: '5.1.02', name: 'Cargas Sociales Patronales', type: 'egreso' })
+        findByCode(accounts, '5.2.2') ?? findAccount(accounts, 'egreso', ['carga', 'patronal', 'social']),
+        { company_id: companyId, code: '5.2.2', name: 'Cargas Sociales (Comercialización)', type: 'egreso' })
 
       const cuentaAPagar = await getOrCreate(supabase,
-        findAccount(accounts, 'pasivo', ['sueldo a pagar', 'haberes a pagar', 'sueldos a pagar']),
-        { company_id: cId, code: '2.1.01', name: 'Sueldos a Pagar', type: 'pasivo' })
+        findByCode(accounts, '2.1.6'),
+        { company_id: companyId, code: '2.1.6', name: 'Sueldos y Jornales a Pagar', type: 'pasivo' })
 
       const cuentaRetenc = await getOrCreate(supabase,
-        findAccount(accounts, 'pasivo', ['retenc', 'aporte', 'descuento']),
-        { company_id: cId, code: '2.1.02', name: 'Retenciones Previsionales a Pagar', type: 'pasivo' })
+        findByCode(accounts, '2.1.18'),
+        { company_id: companyId, code: '2.1.18', name: 'Retenciones Previsionales a Pagar', type: 'pasivo' })
 
       const cuentaCargasPasivo = await getOrCreate(supabase,
-        findAccount(accounts, 'pasivo', ['patronal', 'contribuc', 'carga social']),
-        { company_id: cId, code: '2.1.03', name: 'Contribuciones Patronales a Pagar', type: 'pasivo' })
+        findByCode(accounts, '2.1.7'),
+        { company_id: companyId, code: '2.1.7', name: 'Cargas Sociales a Pagar', type: 'pasivo' })
 
       const { totals, period: p, company_name, employee_count } = data
       const desc1 = `Liquidación sueldos ${p} — ${company_name} (${employee_count} empleados)`
