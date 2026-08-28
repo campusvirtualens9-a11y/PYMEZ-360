@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { updateStock } from '@/lib/inventory/stock'
-import { getEntryExplanation } from '@/lib/accounting/entries'
+import { createSaleJournalEntry, getEntryExplanation } from '@/lib/accounting/entries'
 import { updateChallengeProgress, awardXp } from '@/lib/gamification/xp'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -242,7 +242,16 @@ export default function NewSalePage() {
       }
     }
 
-    // 5. Gamificación
+    // 5. Asiento contable automático — igual que compras, cobros y pagos.
+    // Si falla, el comprobante ofrece el botón "Registrar en contabilidad".
+    try {
+      await createSaleJournalEntry(
+        { id: sale.id, company_id: companyId, date, total, transaction_type: transactionType, iva_rate: ivaRate, iibb_rate: companyIibbRate },
+        totalCost
+      )
+    } catch { /* se puede registrar manualmente desde el comprobante */ }
+
+    // 6. Gamificación
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: 'FIRST_SALE' })
     await updateChallengeProgress({ profileId: userId, companyId, challengeCode: transactionType === 'contado' ? 'CASH_SALE' : 'CREDIT_SALE' })
     await awardXp({ profileId: userId, companyId, amount: 20, reason: 'Venta registrada' })
