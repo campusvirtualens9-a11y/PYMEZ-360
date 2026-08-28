@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import AccountingClient from './AccountingClient'
 import { MicroModeBlock } from '@/components/MicroModeBlock'
 import { SueldosSyncCard } from './SueldosSyncCard'
+import { DeudasLaboralesCard } from './DeudasLaboralesCard'
 
 export default async function AccountingPage() {
   const supabase = await createClient()
@@ -76,6 +77,14 @@ export default async function AccountingPage() {
         companyId={company.id}
         userId={user.id}
         accounts={accounts ?? []}
+      />
+
+      <DeudasLaboralesCard
+        companyId={company.id}
+        userId={user.id}
+        entries={entries ?? []}
+        accounts={accounts ?? []}
+        cashAccounts={(cashAccounts ?? []) as { id: string; name: string; type: 'caja' | 'banco'; balance: number }[]}
       />
 
       <AccountingClient
