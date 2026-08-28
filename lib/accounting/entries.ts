@@ -168,11 +168,23 @@ export async function createCollectionJournalEntry(params: {
   collectionId: string
   cashAccountType?: string
   customerName?: string
+  /**
+   * Retención de IIBB practicada por el cliente al pagar. No ingresa a caja:
+   * es un pago a cuenta del impuesto, así que reduce el pasivo 2.1.8.
+   */
+  retencionIibb?: number
 }): Promise<string | null> {
   const supabase = createClient()
   const accounts = await getAccountMap(params.companyId)
   if (!accounts) return null
 
+  const retencion = Math.round((params.retencionIibb ?? 0) * 100) / 100
+
+  // Sin cuenta 2.1.8 el asiento no balancearía. Se deja pendiente para que el
+  // usuario lo registre a mano, igual que cualquier otro fallo del asiento.
+  if (retencion > 0 && !accounts.iibb_pagar) return null
+
+  const neto = Math.round((params.amount - retencion) * 100) / 100
   const debitAccount = params.cashAccountType === 'banco' ? accounts.banco : accounts.caja
 
   const { data: entry, error } = await supabase
@@ -190,10 +202,24 @@ export async function createCollectionJournalEntry(params: {
 
   if (error || !entry) return null
 
-  await supabase.from('journal_entry_lines').insert([
-    { journal_entry_id: entry.id, account_id: debitAccount, debit: params.amount, credit: 0, description: 'Cobro recibido en caja/banco' },
-    { journal_entry_id: entry.id, account_id: accounts.clientes, debit: 0, credit: params.amount, description: 'Cancelación cuenta a cobrar de cliente' },
-  ])
+  const lines: { journal_entry_id: string; account_id: string; debit: number; credit: number; description: string }[] = [
+    { journal_entry_id: entry.id, account_id: debitAccount, debit: neto, credit: 0, description: 'Cobro recibido en caja/banco' },
+  ]
+
+  if (retencion > 0) {
+    lines.push({
+      journal_entry_id: entry.id, account_id: accounts.iibb_pagar, debit: retencion, credit: 0,
+      description: 'Retención de IIBB sufrida — pago a cuenta del impuesto',
+    })
+  }
+
+  // El cliente cancela el total facturado, aunque parte se haya ido en la retención.
+  lines.push({
+    journal_entry_id: entry.id, account_id: accounts.clientes, debit: 0, credit: params.amount,
+    description: 'Cancelación cuenta a cobrar de cliente',
+  })
+
+  await supabase.from('journal_entry_lines').insert(lines)
 
   return entry.id
 }

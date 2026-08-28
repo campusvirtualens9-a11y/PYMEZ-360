@@ -13,6 +13,7 @@ interface JournalLine {
 }
 interface JournalEntry {
   id: string; date: string; description: string; entry_type: string
+  reference_type?: string | null
   lines: JournalLine[]
 }
 interface Account { id: string; code: string; name: string; type: string; is_active: boolean }
@@ -151,6 +152,22 @@ export default function ExportsClient({ company, entries, accounts, sales, purch
   const baseIIBB      = ivaVentas.reduce((s, r) => s + r.neto, 0)
   const iibbRate      = Number(company.iibb_rate ?? 0.03)
   const iibbImpuesto  = baseIIBB * iibbRate
+
+  // Retenciones de IIBB sufridas: débitos a 2.1.8 originados en cobros.
+  // Los pagos del impuesto también debitan esa cuenta, pero son asientos
+  // manuales, así que el reference_type los distingue.
+  const retencionesIibb = useMemo(() => {
+    let total = 0
+    for (const e of filteredEntries) {
+      if (e.reference_type !== 'collection') continue
+      for (const l of e.lines ?? []) {
+        if (l.account?.code === '2.1.8') total += Number(l.debit)
+      }
+    }
+    return Math.round(total * 100) / 100
+  }, [filteredEntries])
+
+  const iibbSaldoAIngresar = Math.max(0, iibbImpuesto - retencionesIibb)
   const totalActivo   = trialBalance.reduce((s, r) => s + r.bgActivo, 0)
   const totalPasivo   = trialBalance.reduce((s, r) => s + r.bgPasivo, 0)
 
@@ -250,9 +267,9 @@ export default function ExportsClient({ company, entries, accounts, sales, purch
       ['Base imponible neta (sin IVA)', baseIIBB.toFixed(2)],
       ['Alícuota IIBB', `${(iibbRate*100).toFixed(1)}%`],
       ['Impuesto determinado', iibbImpuesto.toFixed(2)],
-      ['(-) Retenciones / percepciones sufridas', 0],
+      ['(-) Retenciones / percepciones sufridas', retencionesIibb.toFixed(2)],
       ['(-) Saldo a favor período anterior', 0],
-      ['SALDO A INGRESAR', iibbImpuesto.toFixed(2)],
+      ['SALDO A INGRESAR', iibbSaldoAIngresar.toFixed(2)],
       [],
       ['Organismo de pago', 'DGR Misiones — dgr.misiones.gov.ar'],
       ['Vencimiento', 'Día 25 del mes siguiente'],
@@ -779,14 +796,15 @@ export default function ExportsClient({ company, entries, accounts, sales, purch
                   <span className="font-bold text-orange-700">{fmt(iibbImpuesto)}</span>
                 </div>
                 <div className="flex justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-600">(−) Retenciones / percepciones</span><span>$ 0,00</span>
+                  <span className="text-slate-600">(−) Retenciones / percepciones</span>
+                  <span className={retencionesIibb > 0 ? 'font-bold text-purple-700' : ''}>{fmt(retencionesIibb)}</span>
                 </div>
                 <div className="flex justify-between py-1.5 border-b border-slate-100">
                   <span className="text-slate-600">(−) Saldo a favor período anterior</span><span>$ 0,00</span>
                 </div>
                 <div className="flex justify-between py-3 px-4 rounded-xl mt-3 font-bold bg-orange-50">
                   <span className="text-orange-800">SALDO A INGRESAR</span>
-                  <span className="text-orange-700">{fmt(iibbImpuesto)}</span>
+                  <span className="text-orange-700">{fmt(iibbSaldoAIngresar)}</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-2">
                   Vencimiento: día 25 del mes siguiente. Sistema: DGR Misiones — dgr.misiones.gov.ar · Bancos habilitados.

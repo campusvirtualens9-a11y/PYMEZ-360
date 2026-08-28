@@ -19,6 +19,7 @@ export default function CollectionsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selected, setSelected] = useState<any>(null)
   const [amount, setAmount] = useState(0)
+  const [retencion, setRetencion] = useState(0)
   const [cashAccountId, setCashAccountId] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [saving, setSaving] = useState(false)
@@ -30,6 +31,7 @@ export default function CollectionsPage() {
   const [reciboData, setReciboData] = useState<{
     customerName: string; amount: number; date: string; paymentMethod: string
     cashAccountName: string; collectionId: string; cashAccountType: string
+    retencion: number
   } | null>(null)
   const [reciboAccounting, setReciboAccounting] = useState<'idle' | 'loading' | 'done'>('idle')
   const [collectError, setCollectError] = useState<string | null>(null)
@@ -70,6 +72,7 @@ export default function CollectionsPage() {
   function openCollect(recv: any) {
     setSelected(recv)
     setAmount(Number(recv.pending_amount))
+    setRetencion(0)
     setTip('')
     setCollectError(null)
     setModalOpen(true)
@@ -77,9 +80,15 @@ export default function CollectionsPage() {
 
   async function handleCollect() {
     if (!selected || amount <= 0 || !cashAccountId || !companyId || !userId) return
+    if (retencion < 0 || retencion >= amount) {
+      setCollectError('La retención debe ser menor al monto cobrado.')
+      return
+    }
     setSaving(true)
     setCollectError(null)
 
+    // Lo retenido no entra a caja: queda como pago a cuenta del IIBB.
+    const neto  = Math.round((amount - retencion) * 100) / 100
     const today = new Date().toISOString().split('T')[0]
     const { data: collInsert, error: insertErr } = await supabase.from('collections').insert({
       company_id: companyId,
@@ -121,13 +130,13 @@ export default function CollectionsPage() {
 
     const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
     if (acct) {
-      await supabase.from('cash_accounts').update({ balance: Number(acct.balance) + amount }).eq('id', cashAccountId)
+      await supabase.from('cash_accounts').update({ balance: Number(acct.balance) + neto }).eq('id', cashAccountId)
     }
     await supabase.from('cash_movements').insert({
       company_id: companyId, cash_account_id: cashAccountId,
       date: today,
-      type: 'ingreso', amount,
-      concept: `Cobro de ${selected.customer?.name ?? 'cliente'}`,
+      type: 'ingreso', amount: neto,
+      concept: `Cobro de ${selected.customer?.name ?? 'cliente'}${retencion > 0 ? ' (neto de retención IIBB)' : ''}`,
       reference_type: 'collection', reference_id: collInsert.id, created_by: userId,
     })
 
@@ -143,6 +152,7 @@ export default function CollectionsPage() {
         collectionId: collInsert.id,
         cashAccountType: selectedCashAccount?.type ?? 'caja',
         customerName: selected.customer?.name,
+        retencionIibb: retencion,
       })
       journalDone = true
     } catch { /* errores no bloquean el flujo principal */ }
@@ -159,6 +169,7 @@ export default function CollectionsPage() {
       cashAccountName: selectedCashAccount?.name ?? '—',
       collectionId: collInsert.id,
       cashAccountType: selectedCashAccount?.type ?? 'caja',
+      retencion,
     })
     setReciboOpen(true)
     loadData()
@@ -174,6 +185,7 @@ export default function CollectionsPage() {
       collectionId: reciboData.collectionId,
       cashAccountType: reciboData.cashAccountType,
       customerName: reciboData.customerName,
+      retencionIibb: reciboData.retencion,
     })
     setReciboAccounting('done')
   }
@@ -351,6 +363,24 @@ export default function CollectionsPage() {
             )}
           </div>
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Retención de IIBB sufrida <span className="font-normal text-slate-400">(opcional)</span>
+            </label>
+            <input type="number" value={retencion} min="0" max={amount} step="0.01"
+              onChange={(e) => setRetencion(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm" />
+            {retencion > 0 ? (
+              <p className="text-xs text-purple-600 mt-1">
+                Ingresan {formatCurrency(amount - retencion)} a {paymentMethod === 'efectivo' ? 'caja' : 'la cuenta'};
+                los {formatCurrency(retencion)} retenidos se computan a cuenta del IIBB y bajan la deuda del impuesto.
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 mt-1">
+                Completalo si el cliente es agente de retención y te entregó el certificado.
+              </p>
+            )}
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Medio de cobro</label>
             <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm bg-white">
@@ -400,7 +430,11 @@ export default function CollectionsPage() {
           {/* Acción contable */}
           <div className={`p-3 rounded-lg border text-sm ${reciboAccounting === 'done' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
             {reciboAccounting === 'done' ? (
-              <p className="font-medium">✓ Asiento contable registrado — Debe Caja/Banco / Haber Clientes</p>
+              <p className="font-medium">
+                {(reciboData?.retencion ?? 0) > 0
+                  ? '✓ Asiento contable registrado — Debe Caja/Banco + IIBB a Pagar / Haber Clientes'
+                  : '✓ Asiento contable registrado — Debe Caja/Banco / Haber Clientes'}
+              </p>
             ) : (
               <div className="flex items-center justify-between gap-3">
                 <span className="text-slate-500">Asiento contable: pendiente</span>
