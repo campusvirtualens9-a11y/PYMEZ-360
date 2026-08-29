@@ -59,7 +59,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
                 required
                 placeholder="tu@email.com"
                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 placeholder-slate-400"
@@ -85,6 +85,15 @@ export default function LoginPage() {
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
           </form>
+
+          <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-200">
+            <p className="text-xs font-bold text-red-800 mb-1">Guardá tu contraseña</p>
+            <p className="text-xs text-red-700 leading-relaxed">
+              Esta app todavía no envía correos de recuperación: si perdés tu contraseña
+              no podemos restablecerla, y perderías el acceso a tu cuenta y a todo lo que
+              hayas cargado. Anotala junto con el email con el que te registrás.
+            </p>
+          </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
             ¿No tenés cuenta?{' '}
