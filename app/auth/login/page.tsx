@@ -31,22 +31,6 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  async function handleDemoLogin() {
-    setLoading(true)
-    setError('')
-    const { error } = await supabase.auth.signInWithPassword({
-      email: 'demo@eduerp360.com',
-      password: 'demo1234',
-    })
-    if (error) {
-      setError('Modo demo no disponible. Registrate para usar la app.')
-      setLoading(false)
-      return
-    }
-    router.push('/dashboard')
-    router.refresh()
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 p-4">
       <div className="w-full max-w-md">
@@ -101,25 +85,6 @@ export default function LoginPage() {
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
           </form>
-
-          <div className="mt-4">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-400">o</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleDemoLogin}
-              disabled={loading}
-              className="mt-4 w-full py-2.5 px-4 border-2 border-blue-200 text-blue-700 hover:bg-blue-50 font-medium rounded-lg transition-colors text-sm"
-            >
-              Probar modo demo
-            </button>
-          </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
             ¿No tenés cuenta?{' '}
