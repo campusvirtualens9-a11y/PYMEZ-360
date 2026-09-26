@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/utils/cn'
 import { CopyTokenCard } from './CopyTokenCard'
 import { MicroModeToggle } from './MicroModeToggle'
 import { IibbActividadCard } from './IibbActividadCard'
+import { EditarEmpresaCard } from './EditarEmpresaCard'
 import { TributarPosLink } from '@/components/companies/TributarPosLink'
 
 const SECTOR_LABELS: Record<string, { label: string; icon: string }> = {
@@ -115,6 +116,15 @@ export default async function CompaniesPage() {
           <p className="text-xs text-slate-400 mt-1">cuentas contables</p>
         </CardContent></Card>
       </div>
+
+      <EditarEmpresaCard
+        companyId={company.id}
+        nombre={company.name}
+        cuit={company.cuit}
+        domicilio={company.address}
+        sector={company.sector}
+        inicio={company.sim_start_date ?? company.created_at}
+      />
 
       <IibbActividadCard companyId={company.id} currentRate={Number(company.iibb_rate)} />
 
