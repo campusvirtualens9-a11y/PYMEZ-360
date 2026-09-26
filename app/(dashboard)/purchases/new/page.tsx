@@ -194,7 +194,7 @@ export default function NewPurchasePage() {
     if (transactionType === 'contado') {
       const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
       if (acct) {
-        await supabase.from('cash_accounts').update({ balance: Number(acct.balance) - total }).eq('id', cashAccountId)
+        await supabase.rpc('update_cash_balance', { p_account_id: cashAccountId, p_delta: -(total) })
       }
       await supabase.from('cash_movements').insert({
         company_id: companyId,
@@ -218,7 +218,7 @@ export default function NewPurchasePage() {
       })
       const { data: sup } = await supabase.from('suppliers').select('balance').eq('id', supplierId).single()
       if (sup) {
-        await supabase.from('suppliers').update({ balance: Number(sup.balance) + total }).eq('id', supplierId)
+        await supabase.rpc('update_supplier_balance', { p_supplier_id: supplierId, p_delta: total })
       }
     }
 

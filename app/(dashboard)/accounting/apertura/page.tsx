@@ -77,14 +77,14 @@ export default function AperturaPage() {
       const { data: cajas } = await supabase
         .from('cash_accounts').select('id, balance').eq('company_id', companyId).eq('type', 'caja').limit(1)
       if (cajas && cajas.length > 0) {
-        await supabase.from('cash_accounts').update({ balance: Number(cajas[0].balance) + cash }).eq('id', cajas[0].id)
+        await supabase.rpc('update_cash_balance', { p_account_id: cajas[0].id, p_delta: cash })
       }
     }
     if (bank > 0) {
       const { data: bancos } = await supabase
         .from('cash_accounts').select('id, balance').eq('company_id', companyId).eq('type', 'banco').limit(1)
       if (bancos && bancos.length > 0) {
-        await supabase.from('cash_accounts').update({ balance: Number(bancos[0].balance) + bank }).eq('id', bancos[0].id)
+        await supabase.rpc('update_cash_balance', { p_account_id: bancos[0].id, p_delta: bank })
       }
     }
 

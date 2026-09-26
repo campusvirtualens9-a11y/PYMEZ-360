@@ -106,7 +106,7 @@ export default function PurchaseComprobantePage() {
     if (purchase.transaction_type === 'contado' && purchase.cash_account_id) {
       const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', purchase.cash_account_id).single()
       if (acct) {
-        await supabase.from('cash_accounts').update({ balance: Number(acct.balance) + Number(purchase.total) }).eq('id', purchase.cash_account_id)
+        await supabase.rpc('update_cash_balance', { p_account_id: purchase.cash_account_id, p_delta: Number(purchase.total) })
       }
       await supabase.from('cash_movements').insert({
         company_id: purchase.company_id, cash_account_id: purchase.cash_account_id,
@@ -118,7 +118,7 @@ export default function PurchaseComprobantePage() {
       await supabase.from('payables').update({ pending_amount: 0, status: 'pagado' }).eq('id', payable.id)
       const { data: sup } = await supabase.from('suppliers').select('balance').eq('id', payable.supplier_id).single()
       if (sup) {
-        await supabase.from('suppliers').update({ balance: Math.max(0, Number(sup.balance) - Number(payable.original_amount)) }).eq('id', payable.supplier_id)
+        await supabase.rpc('update_supplier_balance', { p_supplier_id: payable.supplier_id, p_delta: -(Number(payable.original_amount)) })
       }
     }
 

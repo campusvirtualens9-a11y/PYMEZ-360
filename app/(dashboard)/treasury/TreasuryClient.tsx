@@ -234,10 +234,10 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
       reference_type: 'manual', created_by: userId,
     })
 
-    if (cashAcc) {
-      const newBal = mType === 'ingreso' ? Number(cashAcc.balance) + amt : Number(cashAcc.balance) - amt
-      await supabase.from('cash_accounts').update({ balance: newBal }).eq('id', mAccountId)
-    }
+    await supabase.rpc('update_cash_balance', {
+      p_account_id: mAccountId,
+      p_delta: mType === 'ingreso' ? amt : -amt,
+    })
 
     // Asiento contable: Debe/Haber según el tipo y la contrapartida elegida
     if (mCounterpartId && cashAcc) {
@@ -374,7 +374,7 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
       reference_type: 'transfer', created_by: userId,
     })
     if (fromAcc) {
-      await supabase.from('cash_accounts').update({ balance: Number(fromAcc.balance) - amt }).eq('id', tFrom)
+      await supabase.rpc('update_cash_balance', { p_account_id: tFrom, p_delta: -(amt) })
     }
 
     // Ingreso en destino
@@ -384,7 +384,7 @@ export default function TreasuryClient({ companyId, userId, initialAccounts }: P
       reference_type: 'transfer', created_by: userId,
     })
     if (toAcc) {
-      await supabase.from('cash_accounts').update({ balance: Number(toAcc.balance) + amt }).eq('id', tTo)
+      await supabase.rpc('update_cash_balance', { p_account_id: tTo, p_delta: amt })
     }
 
     // Asiento contable (solo cuando los tipos difieren: caja ↔ banco)

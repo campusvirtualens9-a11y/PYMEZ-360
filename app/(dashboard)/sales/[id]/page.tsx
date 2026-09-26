@@ -112,7 +112,7 @@ export default function SaleComprobantePage() {
     if (sale.transaction_type === 'contado' && sale.cash_account_id) {
       const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', sale.cash_account_id).single()
       if (acct) {
-        await supabase.from('cash_accounts').update({ balance: Number(acct.balance) - Number(sale.total) }).eq('id', sale.cash_account_id)
+        await supabase.rpc('update_cash_balance', { p_account_id: sale.cash_account_id, p_delta: -(Number(sale.total)) })
       }
       await supabase.from('cash_movements').insert({
         company_id: sale.company_id, cash_account_id: sale.cash_account_id,
@@ -124,7 +124,7 @@ export default function SaleComprobantePage() {
       await supabase.from('receivables').update({ pending_amount: 0, status: 'cobrado' }).eq('id', receivable.id)
       const { data: cust } = await supabase.from('customers').select('balance').eq('id', receivable.customer_id).single()
       if (cust) {
-        await supabase.from('customers').update({ balance: Math.max(0, Number(cust.balance) - Number(receivable.original_amount)) }).eq('id', receivable.customer_id)
+        await supabase.rpc('update_customer_balance', { p_customer_id: receivable.customer_id, p_delta: -(Number(receivable.original_amount)) })
       }
     }
 

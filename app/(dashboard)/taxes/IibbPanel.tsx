@@ -92,10 +92,7 @@ export function IibbPanel({
     })
 
     if (cuenta) {
-      await supabase
-        .from('cash_accounts')
-        .update({ balance: Number(cuenta.balance) - monto })
-        .eq('id', accountId)
+      await supabase.rpc('update_cash_balance', { p_account_id: accountId, p_delta: -(monto) })
     }
 
     // Debe 2.1.8 IIBB a pagar / Haber Caja o Banco: cancela el pasivo devengado.

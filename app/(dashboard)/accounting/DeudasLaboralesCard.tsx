@@ -107,9 +107,7 @@ export function DeudasLaboralesCard({ companyId, userId, entries, accounts, cash
       })
 
       if (cuenta) {
-        await supabase.from('cash_accounts')
-          .update({ balance: Number(cuenta.balance) - monto })
-          .eq('id', accountId)
+        await supabase.rpc('update_cash_balance', { p_account_id: accountId, p_delta: -(monto) })
       }
 
       if (modo === 'sueldos') {

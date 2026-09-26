@@ -125,12 +125,12 @@ export default function CollectionsPage() {
 
     const { data: cust } = await supabase.from('customers').select('balance').eq('id', selected.customer_id).single()
     if (cust) {
-      await supabase.from('customers').update({ balance: Math.max(0, Number(cust.balance) - amount) }).eq('id', selected.customer_id)
+      await supabase.rpc('update_customer_balance', { p_customer_id: selected.customer_id, p_delta: -(amount) })
     }
 
     const { data: acct } = await supabase.from('cash_accounts').select('balance').eq('id', cashAccountId).single()
     if (acct) {
-      await supabase.from('cash_accounts').update({ balance: Number(acct.balance) + neto }).eq('id', cashAccountId)
+      await supabase.rpc('update_cash_balance', { p_account_id: cashAccountId, p_delta: neto })
     }
     await supabase.from('cash_movements').insert({
       company_id: companyId, cash_account_id: cashAccountId,

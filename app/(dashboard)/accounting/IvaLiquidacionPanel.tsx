@@ -190,9 +190,7 @@ export function IvaLiquidacionPanel({ entries, accounts, companyId, userId, cash
     })
 
     if (cuenta) {
-      await supabase.from('cash_accounts')
-        .update({ balance: Number(cuenta.balance) - monto })
-        .eq('id', pAccountId)
+      await supabase.rpc('update_cash_balance', { p_account_id: pAccountId, p_delta: -(monto) })
     }
 
     // Debe 2.1.12 IVA a Pagar / Haber Caja o Banco.

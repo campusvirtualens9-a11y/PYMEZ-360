@@ -123,10 +123,10 @@ export default function PaymentsPage() {
 
     const { data: sup } = await supabase.from('suppliers').select('balance').eq('id', selected.supplier_id).single()
     if (sup) {
-      await supabase.from('suppliers').update({ balance: Math.max(0, Number(sup.balance) - amount) }).eq('id', selected.supplier_id)
+      await supabase.rpc('update_supplier_balance', { p_supplier_id: selected.supplier_id, p_delta: -(amount) })
     }
 
-    await supabase.from('cash_accounts').update({ balance: Number(acct.balance) - amount }).eq('id', cashAccountId)
+    await supabase.rpc('update_cash_balance', { p_account_id: cashAccountId, p_delta: -(amount) })
 
     await supabase.from('cash_movements').insert({
       company_id: companyId, cash_account_id: cashAccountId,
