@@ -49,6 +49,7 @@ export default function NewCompanyPage() {
         cuit,
         address,
         iibb_rate: iibbRate,
+        iibb_activity_code: actividad || null,
         owner_id: user.id,
         sim_start_date: new Date().toISOString().split('T')[0],
       })

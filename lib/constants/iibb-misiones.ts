@@ -225,3 +225,29 @@ export const ACTIVITY_CATEGORIES: { key: IIBBActivity['category']; label: string
   { key: 'construccion', label: 'Construcción' },
   { key: 'primario',     label: 'Actividad primaria' },
 ]
+
+/**
+ * Qué actividad tiene una empresa.
+ *
+ * Hasta septiembre de 2026 sólo se guardaba la alícuota y la actividad se
+ * deducía al revés, buscando la primera del catálogo que la tuviera. Eso
+ * acierta poco: las 24 actividades se agrupan en apenas 6 alícuotas, así que
+ * 20 de ellas comparten alícuota con alguna otra y la ficha de la empresa
+ * mostraba un rubro que no era el elegido.
+ *
+ * Ahora `companies.iibb_activity_code` guarda el código. Cuando está, es la
+ * respuesta definitiva. Cuando falta — empresas creadas antes de la columna —
+ * se sigue sugiriendo por alícuota, pero marcado como no confirmado para no
+ * afirmar algo que no se sabe.
+ */
+export function resolverActividad(
+  code: string | null | undefined,
+  rate: number | null | undefined,
+): { actividad: IIBBActivity | null; confirmada: boolean } {
+  if (code) {
+    const exacta = IIBB_ACTIVITIES.find(a => a.code === code)
+    if (exacta) return { actividad: exacta, confirmada: true }
+  }
+  const porAlicuota = IIBB_ACTIVITIES.find(a => a.rate === Number(rate))
+  return { actividad: porAlicuota ?? null, confirmada: false }
+}

@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/utils/cn'
 import { CopyTokenCard } from './CopyTokenCard'
 import { MicroModeToggle } from './MicroModeToggle'
 import { IibbActividadCard } from './IibbActividadCard'
+import { resolverActividad } from '@/lib/constants/iibb-misiones'
 import { EditarEmpresaCard } from './EditarEmpresaCard'
 import { TributarPosLink } from '@/components/companies/TributarPosLink'
 
@@ -17,14 +18,6 @@ const SECTOR_LABELS: Record<string, { label: string; icon: string }> = {
   salud:        { label: 'Salud',           icon: '🏥' },
   gastronomia:  { label: 'Gastronomía',     icon: '🍽️' },
   transporte:   { label: 'Transporte',      icon: '🚚' },
-}
-
-const IIBB_LABELS: Record<number, string> = {
-  0.03:  'Misiones / Bs. As. / CABA — 3%',
-  0.035: 'Córdoba — 3.5%',
-  0.02:  'Actividad reducida — 2%',
-  0.015: 'Actividad reducida — 1.5%',
-  0:     'Exento',
 }
 
 export default async function CompaniesPage() {
@@ -58,7 +51,12 @@ export default async function CompaniesPage() {
 
   const totalCash = (cashAccounts ?? []).reduce((s, a) => s + Number(a.balance), 0)
   const sector = SECTOR_LABELS[company.sector] ?? { label: company.sector, icon: '🏢' }
-  const iibbLabel = IIBB_LABELS[Number(company.iibb_rate)] ?? `${(Number(company.iibb_rate) * 100).toFixed(1)}%`
+  // La alicuota sale de la actividad, no de la provincia: se muestra que
+  // actividad es, y si todavia no se confirmo se dice en vez de inventarla.
+  const { actividad: actIibb, confirmada: actConfirmada } = resolverActividad(
+    (company as any).iibb_activity_code, Number(company.iibb_rate))
+  const iibbPct   = `${(Number(company.iibb_rate) * 100).toFixed(1)}%`
+  const iibbLabel = actIibb ? `${actIibb.name} — ${iibbPct}` : (Number(company.iibb_rate) === 0 ? 'Exento' : iibbPct)
 
   return (
     <div className="space-y-6">
@@ -126,7 +124,11 @@ export default async function CompaniesPage() {
         inicio={company.sim_start_date ?? company.created_at}
       />
 
-      <IibbActividadCard companyId={company.id} currentRate={Number(company.iibb_rate)} />
+      <IibbActividadCard
+        companyId={company.id}
+        currentRate={Number(company.iibb_rate)}
+        currentCode={(company as any).iibb_activity_code ?? null}
+      />
 
       <MicroModeToggle initialMode={(company as any).microemprendimiento_mode ?? false} />
 
@@ -148,8 +150,10 @@ export default async function CompaniesPage() {
                 <span className="text-sm font-medium text-slate-800">Misiones</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                <span className="text-sm text-slate-500">Alícuota IIBB</span>
-                <Badge variant="info">{iibbLabel}</Badge>
+                <span className="text-sm text-slate-500">Actividad / alícuota IIBB</span>
+                <Badge variant={actConfirmada || !actIibb ? "info" : "warning"}>
+                  {iibbLabel}{actIibb && !actConfirmada && " (sin confirmar)"}
+                </Badge>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-slate-500">IIBB — Organismo</span>
